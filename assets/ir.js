@@ -137,6 +137,22 @@ function validateStep(step, diagnostics, ids) {
     pushDiagnostic(diagnostics, "error", "action.unknown", "Unknown action: " + step.action, step.id);
   }
 
+  if (step.action === "telegram.sendButtons") {
+    const source = String(step.config?.buttons || "");
+    if (source && !source.includes("{{")) {
+      try {
+        const parsed = JSON.parse(source);
+        if (!Array.isArray(parsed)) throw new Error("not array");
+      } catch {
+        pushDiagnostic(diagnostics, "error", "telegram.buttons", "Telegram inline buttons must be a JSON array.", step.id);
+      }
+    }
+  }
+
+  if (step.action === "discord.reply" && !String(step.action || "").startsWith("discord.")) {
+    pushDiagnostic(diagnostics, "error", "discord.reply.context", "Discord reply requires a Discord message or slash-command context.", step.id);
+  }
+
   if (step.action === "http.request") {
     const method = String(step.config?.method || "GET").toUpperCase();
     if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -144,6 +160,20 @@ function validateStep(step, diagnostics, ids) {
     }
     if (!String(step.config?.url || "").trim()) {
       pushDiagnostic(diagnostics, "error", "http.url", "HTTP request needs a URL.", step.id);
+    }
+    const timeout = Number(step.config?.timeoutMs ?? 10000);
+    if (!Number.isFinite(timeout) || timeout < 100 || timeout > 120000) {
+      pushDiagnostic(diagnostics, "error", "http.timeout", "HTTP timeout must be between 100 and 120000 ms.", step.id);
+    }
+    for (const fieldName of ["query", "headers"]) {
+      const value = String(step.config?.[fieldName] || "{}");
+      if (value.includes("{{")) continue;
+      try {
+        const parsed = JSON.parse(value);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object");
+      } catch {
+        pushDiagnostic(diagnostics, "error", "http." + fieldName, "HTTP " + fieldName + " must be a JSON object.", step.id);
+      }
     }
   }
 

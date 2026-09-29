@@ -46,6 +46,8 @@ const DEFINITIONS = [
     type: "brikode_telegram_send",
     message0: "Telegram  send %1",
     args0: [{ type: "field_input", name: "TEXT", text: "Hello {{trigger.text}}" }],
+    message1: "chat ID (optional) %1",
+    args1: [{ type: "field_input", name: "CHAT", text: "" }],
     previousStatement: null,
     nextStatement: null,
     colour: 205
@@ -56,6 +58,8 @@ const DEFINITIONS = [
     args0: [{ type: "field_input", name: "URL", text: "https://example.com/file.pdf" }],
     message1: "caption %1",
     args1: [{ type: "field_input", name: "CAPTION", text: "" }],
+    message2: "chat ID (optional) %1",
+    args2: [{ type: "field_input", name: "CHAT", text: "" }],
     previousStatement: null,
     nextStatement: null,
     colour: 205
@@ -66,6 +70,8 @@ const DEFINITIONS = [
     args0: [{ type: "field_input", name: "TEXT", text: "Choose an option" }],
     message1: "inline buttons JSON %1",
     args1: [{ type: "field_input", name: "BUTTONS", text: "[[{\"text\":\"OK\",\"callback_data\":\"ok\"}]]" }],
+    message2: "chat ID (optional) %1",
+    args2: [{ type: "field_input", name: "CHAT", text: "" }],
     previousStatement: null,
     nextStatement: null,
     colour: 205
@@ -74,6 +80,8 @@ const DEFINITIONS = [
     type: "brikode_discord_send",
     message0: "Discord  send %1",
     args0: [{ type: "field_input", name: "TEXT", text: "Hello {{trigger.text}}" }],
+    message1: "channel ID (optional) %1",
+    args1: [{ type: "field_input", name: "CHANNEL", text: "" }],
     previousStatement: null,
     nextStatement: null,
     colour: 265
@@ -92,6 +100,8 @@ const DEFINITIONS = [
     args0: [{ type: "field_input", name: "TITLE", text: "Brikode" }],
     message1: "description %1",
     args1: [{ type: "field_input", name: "DESCRIPTION", text: "Hello {{trigger.text}}" }],
+    message2: "channel ID (optional) %1",
+    args2: [{ type: "field_input", name: "CHANNEL", text: "" }],
     previousStatement: null,
     nextStatement: null,
     colour: 265
@@ -387,7 +397,7 @@ function compileChain(firstBlock) {
           id: block.id,
           type: "action",
           action: "telegram.sendMessage",
-          config: { text: field(block, "TEXT") }
+          config: { text: field(block, "TEXT"), chatId: field(block, "CHAT") }
         };
         break;
       case "brikode_telegram_file":
@@ -395,7 +405,7 @@ function compileChain(firstBlock) {
           id: block.id,
           type: "action",
           action: "telegram.sendFile",
-          config: { url: field(block, "URL"), caption: field(block, "CAPTION") }
+          config: { url: field(block, "URL"), caption: field(block, "CAPTION"), chatId: field(block, "CHAT") }
         };
         break;
       case "brikode_telegram_buttons":
@@ -403,7 +413,7 @@ function compileChain(firstBlock) {
           id: block.id,
           type: "action",
           action: "telegram.sendButtons",
-          config: { text: field(block, "TEXT"), buttons: field(block, "BUTTONS", "[]") }
+          config: { text: field(block, "TEXT"), buttons: field(block, "BUTTONS", "[]"), chatId: field(block, "CHAT") }
         };
         break;
       case "brikode_discord_send":
@@ -411,7 +421,7 @@ function compileChain(firstBlock) {
           id: block.id,
           type: "action",
           action: "discord.sendMessage",
-          config: { text: field(block, "TEXT") }
+          config: { text: field(block, "TEXT"), channelId: field(block, "CHANNEL") }
         };
         break;
       case "brikode_discord_reply":
@@ -427,7 +437,7 @@ function compileChain(firstBlock) {
           id: block.id,
           type: "action",
           action: "discord.sendEmbed",
-          config: { title: field(block, "TITLE"), description: field(block, "DESCRIPTION") }
+          config: { title: field(block, "TITLE"), description: field(block, "DESCRIPTION"), channelId: field(block, "CHANNEL") }
         };
         break;
       case "brikode_http_request":
@@ -528,12 +538,12 @@ const TRIGGER_BLOCKS = {
 };
 
 const ACTION_BLOCKS = {
-  "telegram.sendMessage": ["brikode_telegram_send", { TEXT: "text" }],
-  "telegram.sendFile": ["brikode_telegram_file", { URL: "url", CAPTION: "caption" }],
-  "telegram.sendButtons": ["brikode_telegram_buttons", { TEXT: "text", BUTTONS: "buttons" }],
-  "discord.sendMessage": ["brikode_discord_send", { TEXT: "text" }],
+  "telegram.sendMessage": ["brikode_telegram_send", { TEXT: "text", CHAT: "chatId" }],
+  "telegram.sendFile": ["brikode_telegram_file", { URL: "url", CAPTION: "caption", CHAT: "chatId" }],
+  "telegram.sendButtons": ["brikode_telegram_buttons", { TEXT: "text", BUTTONS: "buttons", CHAT: "chatId" }],
+  "discord.sendMessage": ["brikode_discord_send", { TEXT: "text", CHANNEL: "channelId" }],
   "discord.reply": ["brikode_discord_reply", { TEXT: "text" }],
-  "discord.sendEmbed": ["brikode_discord_embed", { TITLE: "title", DESCRIPTION: "description" }],
+  "discord.sendEmbed": ["brikode_discord_embed", { TITLE: "title", DESCRIPTION: "description", CHANNEL: "channelId" }],
   "http.request": ["brikode_http_request", { METHOD: "method", URL: "url", QUERY: "query", HEADERS: "headers", BODY: "body", TIMEOUT: "timeoutMs", AS: "as" }],
   "core.delay": ["brikode_delay", { MS: "ms" }],
   "core.log": ["brikode_log", { MESSAGE: "message" }],
