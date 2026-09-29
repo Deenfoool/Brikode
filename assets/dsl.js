@@ -47,22 +47,22 @@ function actionToLines(step, indent, lines) {
   const config = step.config || {};
   switch (step.action) {
     case "telegram.sendMessage":
-      lines.push(pad + "TELEGRAM_SEND " + quote(config.text || ""));
+      lines.push(pad + "TELEGRAM_SEND " + quote(config.text || "") + " TO " + quote(config.chatId || ""));
       break;
     case "telegram.sendFile":
-      lines.push(pad + "TELEGRAM_FILE " + quote(config.url || "") + " CAPTION " + quote(config.caption || ""));
+      lines.push(pad + "TELEGRAM_FILE " + quote(config.url || "") + " CAPTION " + quote(config.caption || "") + " TO " + quote(config.chatId || ""));
       break;
     case "telegram.sendButtons":
-      lines.push(pad + "TELEGRAM_BUTTONS " + quote(config.text || "") + " BUTTONS " + quote(config.buttons || "[]"));
+      lines.push(pad + "TELEGRAM_BUTTONS " + quote(config.text || "") + " BUTTONS " + quote(config.buttons || "[]") + " TO " + quote(config.chatId || ""));
       break;
     case "discord.sendMessage":
-      lines.push(pad + "DISCORD_SEND " + quote(config.text || ""));
+      lines.push(pad + "DISCORD_SEND " + quote(config.text || "") + " TO " + quote(config.channelId || ""));
       break;
     case "discord.reply":
       lines.push(pad + "DISCORD_REPLY " + quote(config.text || ""));
       break;
     case "discord.sendEmbed":
-      lines.push(pad + "DISCORD_EMBED " + quote(config.title || "") + " DESCRIPTION " + quote(config.description || ""));
+      lines.push(pad + "DISCORD_EMBED " + quote(config.title || "") + " DESCRIPTION " + quote(config.description || "") + " TO " + quote(config.channelId || ""));
       break;
     case "http.request": {
       const options = {
@@ -144,37 +144,47 @@ function parseAction(line, lineNumber, nodeId) {
   let match;
   const id = stableId(nodeId);
 
-  match = line.match(new RegExp("^TELEGRAM_SEND\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id, type: "action", action: "telegram.sendMessage", config: { text: unquote(match[1]) } };
+  match = line.match(new RegExp("^TELEGRAM_SEND\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "telegram.sendMessage",
+    config: { text: unquote(match[1]), chatId: match[2] ? unquote(match[2]) : "" }
+  };
 
-  match = line.match(new RegExp("^TELEGRAM_FILE\\s+(" + QUOTED + ")\\s+CAPTION\\s+(" + QUOTED + ")$", "i"));
+  match = line.match(new RegExp("^TELEGRAM_FILE\\s+(" + QUOTED + ")\\s+CAPTION\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
   if (match) return {
     id,
     type: "action",
     action: "telegram.sendFile",
-    config: { url: unquote(match[1]), caption: unquote(match[2]) }
+    config: { url: unquote(match[1]), caption: unquote(match[2]), chatId: match[3] ? unquote(match[3]) : "" }
   };
 
-  match = line.match(new RegExp("^TELEGRAM_BUTTONS\\s+(" + QUOTED + ")\\s+BUTTONS\\s+(" + QUOTED + ")$", "i"));
+  match = line.match(new RegExp("^TELEGRAM_BUTTONS\\s+(" + QUOTED + ")\\s+BUTTONS\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
   if (match) return {
     id,
     type: "action",
     action: "telegram.sendButtons",
-    config: { text: unquote(match[1]), buttons: unquote(match[2]) }
+    config: { text: unquote(match[1]), buttons: unquote(match[2]), chatId: match[3] ? unquote(match[3]) : "" }
   };
 
-  match = line.match(new RegExp("^DISCORD_SEND\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id, type: "action", action: "discord.sendMessage", config: { text: unquote(match[1]) } };
+  match = line.match(new RegExp("^DISCORD_SEND\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "discord.sendMessage",
+    config: { text: unquote(match[1]), channelId: match[2] ? unquote(match[2]) : "" }
+  };
 
   match = line.match(new RegExp("^DISCORD_REPLY\\s+(" + QUOTED + ")$", "i"));
   if (match) return { id, type: "action", action: "discord.reply", config: { text: unquote(match[1]) } };
 
-  match = line.match(new RegExp("^DISCORD_EMBED\\s+(" + QUOTED + ")\\s+DESCRIPTION\\s+(" + QUOTED + ")$", "i"));
+  match = line.match(new RegExp("^DISCORD_EMBED\\s+(" + QUOTED + ")\\s+DESCRIPTION\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
   if (match) return {
     id,
     type: "action",
     action: "discord.sendEmbed",
-    config: { title: unquote(match[1]), description: unquote(match[2]) }
+    config: { title: unquote(match[1]), description: unquote(match[2]), channelId: match[3] ? unquote(match[3]) : "" }
   };
 
   match = line.match(new RegExp("^HTTP\\s+(GET|POST|PUT|PATCH|DELETE)\\s+(" + QUOTED + ")\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+WITH\\s+(" + QUOTED + "))?$", "i"));

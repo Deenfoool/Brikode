@@ -149,10 +149,6 @@ function validateStep(step, diagnostics, ids) {
     }
   }
 
-  if (step.action === "discord.reply" && !String(step.action || "").startsWith("discord.")) {
-    pushDiagnostic(diagnostics, "error", "discord.reply.context", "Discord reply requires a Discord message or slash-command context.", step.id);
-  }
-
   if (step.action === "http.request") {
     const method = String(step.config?.method || "GET").toUpperCase();
     if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -224,6 +220,16 @@ export function validateProject(raw) {
 
   const ids = new Set(project.trigger?.id ? [project.trigger.id] : []);
   for (const step of project.steps) validateStep(step, diagnostics, ids);
+
+  const hasAction = (steps, action) => (steps || []).some(step =>
+    step.action === action ||
+    (step.type === "condition" && (hasAction(step.then, action) || hasAction(step.else, action))) ||
+    (step.type === "repeat" && hasAction(step.steps, action))
+  );
+
+  if (hasAction(project.steps, "discord.reply") && !project.trigger?.type?.startsWith("discord.")) {
+    pushDiagnostic(diagnostics, "error", "discord.reply.context", "Discord reply requires a Discord message or slash-command trigger.");
+  }
 
   const variableNames = new Set();
   for (const variable of project.variables) {
