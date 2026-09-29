@@ -43,6 +43,18 @@ const DEFINITIONS = [
     colour: 30
   },
   {
+    type: "brikode_webhook_respond",
+    message0: "Webhook  respond status %1",
+    args0: [{ type: "field_number", name: "STATUS", value: 200, min: 100, max: 599, precision: 1 }],
+    message1: "content type %1",
+    args1: [{ type: "field_input", name: "CONTENT_TYPE", text: "application/json" }],
+    message2: "body %1",
+    args2: [{ type: "field_input", name: "BODY", text: "{\"ok\":true}" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 30
+  },
+  {
     type: "brikode_telegram_send",
     message0: "Telegram  send %1",
     args0: [{ type: "field_input", name: "TEXT", text: "Hello {{trigger.text}}" }],
@@ -242,6 +254,14 @@ const TOOLBOX = {
     },
     {
       kind: "category",
+      name: "Webhook",
+      colour: "#c47d34",
+      contents: [
+        { kind: "block", type: "brikode_webhook_respond" }
+      ]
+    },
+    {
+      kind: "category",
       name: "Telegram",
       colour: "#3f9bd8",
       contents: [
@@ -300,6 +320,7 @@ const SEARCH_INDEX = [
   ["discord message trigger", "brikode_trigger_discord_message"],
   ["discord slash command trigger", "brikode_trigger_discord_slash"],
   ["webhook incoming trigger", "brikode_trigger_webhook"],
+  ["webhook response status body", "brikode_webhook_respond"],
   ["telegram send message", "brikode_telegram_send"],
   ["telegram send file", "brikode_telegram_file"],
   ["telegram inline buttons callback", "brikode_telegram_buttons"],
@@ -421,6 +442,18 @@ function compileChain(firstBlock) {
     let node = null;
 
     switch (block.type) {
+      case "brikode_webhook_respond":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "webhook.respond",
+          config: {
+            status: Number(field(block, "STATUS", 200)),
+            contentType: field(block, "CONTENT_TYPE", "application/json"),
+            body: field(block, "BODY", "{\"ok\":true}")
+          }
+        };
+        break;
       case "brikode_telegram_send":
         node = {
           id: block.id,
@@ -583,6 +616,7 @@ const TRIGGER_BLOCKS = {
 };
 
 const ACTION_BLOCKS = {
+  "webhook.respond": ["brikode_webhook_respond", { STATUS: "status", CONTENT_TYPE: "contentType", BODY: "body" }],
   "telegram.sendMessage": ["brikode_telegram_send", { TEXT: "text", CHAT: "chatId" }],
   "telegram.sendFile": ["brikode_telegram_file", { URL: "url", CAPTION: "caption", CHAT: "chatId" }],
   "telegram.sendButtons": ["brikode_telegram_buttons", { TEXT: "text", BUTTONS: "buttons", CHAT: "chatId" }],

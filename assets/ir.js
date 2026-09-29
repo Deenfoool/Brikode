@@ -137,6 +137,16 @@ function validateStep(step, diagnostics, ids) {
     pushDiagnostic(diagnostics, "error", "action.unknown", "Unknown action: " + step.action, step.id);
   }
 
+  if (step.action === "webhook.respond") {
+    const status = Number(step.config?.status);
+    if (!Number.isInteger(status) || status < 100 || status > 599) {
+      pushDiagnostic(diagnostics, "error", "webhook.status", "Webhook response status must be from 100 to 599.", step.id);
+    }
+    if (!String(step.config?.contentType || "").trim()) {
+      pushDiagnostic(diagnostics, "error", "webhook.contentType", "Webhook response content type is required.", step.id);
+    }
+  }
+
   if (step.action === "telegram.sendButtons") {
     const source = String(step.config?.buttons || "");
     if (source && !source.includes("{{")) {

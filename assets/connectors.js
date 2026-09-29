@@ -44,7 +44,9 @@ export const CONNECTORS = {
     triggers: [
       { id: "incoming", label: "Incoming request", inputs: { path: "string" }, outputs: { body: "any", headers: "object", query: "object" } }
     ],
-    actions: []
+    actions: [
+      { id: "respond", label: "Respond", inputs: { status: "number", contentType: "string", body: "any" }, outputs: {} }
+    ]
   },
   http: {
     id: "http",

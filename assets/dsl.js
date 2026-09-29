@@ -46,6 +46,9 @@ function actionToLines(step, indent, lines) {
 
   const config = step.config || {};
   switch (step.action) {
+    case "webhook.respond":
+      lines.push(pad + "WEBHOOK_RESPOND " + String(Number(config.status) || 200) + " TYPE " + quote(config.contentType || "application/json") + " BODY " + quote(config.body ?? ""));
+      break;
     case "telegram.sendMessage":
       lines.push(pad + "TELEGRAM_SEND " + quote(config.text || "") + " TO " + quote(config.chatId || ""));
       break;
@@ -149,6 +152,14 @@ export function projectToDsl(project) {
 function parseAction(line, lineNumber, nodeId) {
   let match;
   const id = stableId(nodeId);
+
+  match = line.match(new RegExp("^WEBHOOK_RESPOND\\s+(\\d{3})\\s+TYPE\\s+(" + QUOTED + ")\\s+BODY\\s+(" + QUOTED + ")$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "webhook.respond",
+    config: { status: Number(match[1]), contentType: unquote(match[2]), body: unquote(match[3]) }
+  };
 
   match = line.match(new RegExp("^TELEGRAM_SEND\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
   if (match) return {
