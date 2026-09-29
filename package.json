@@ -1,0 +1,14 @@
+{
+  "name": "brikode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/core.test.mjs",
+    "check": "node --check assets/app.js && node --check assets/blocks.js && node --check assets/code-editor.js && node --check assets/connectors.js && node --check assets/db.js && node --check assets/dsl.js && node --check assets/exporter.js && node --check assets/ir.js && node --check assets/simulator.js && node --check assets/utils.js && node --check assets/runtime-template.mjs",
+    "verify": "npm run check && npm test"
+  },
+  "engines": {
+    "node": ">=20.10"
+  }
+}

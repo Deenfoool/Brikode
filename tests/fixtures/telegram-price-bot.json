@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "project_fixture_telegram",
+  "name": "Telegram price bot",
+  "connectorVersions": {
+    "telegram": "1.1.0",
+    "core": "1.1.0",
+    "http": "1.1.0"
+  },
+  "trigger": {
+    "id": "trigger_message",
+    "type": "telegram.message",
+    "config": {}
+  },
+  "steps": [
+    {
+      "id": "if_price",
+      "type": "condition",
+      "expression": {
+        "left": "trigger.text",
+        "op": "contains",
+        "right": "price"
+      },
+      "then": [
+        {
+          "id": "lookup",
+          "type": "action",
+          "action": "http.request",
+          "config": {
+            "method": "GET",
+            "url": "https://example.com/products",
+            "query": "{\"q\":\"{{trigger.text}}\"}",
+            "headers": "{}",
+            "body": "",
+            "timeoutMs": 10000,
+            "as": "product"
+          }
+        },
+        {
+          "id": "reply",
+          "type": "action",
+          "action": "telegram.sendMessage",
+          "config": {
+            "text": "Result: {{vars.product.body}}",
+            "chatId": ""
+          }
+        }
+      ],
+      "else": [
+        {
+          "id": "help",
+          "type": "action",
+          "action": "telegram.sendMessage",
+          "config": {
+            "text": "Send a message containing price",
+            "chatId": ""
+          }
+        }
+      ]
+    }
+  ],
+  "variables": [],
+  "metadata": {
+    "createdAt": "2026-09-29T00:00:00.000Z",
+    "updatedAt": "2026-09-29T00:00:00.000Z"
+  }
+}
