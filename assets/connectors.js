@@ -2,7 +2,7 @@ export const CONNECTORS = {
   telegram: {
     id: "telegram",
     label: "Telegram",
-    version: "1.0.0",
+    version: "1.1.0",
     credentials: [
       { id: "botToken", env: "TELEGRAM_BOT_TOKEN", label: "Bot token", secret: true }
     ],
@@ -20,7 +20,7 @@ export const CONNECTORS = {
   discord: {
     id: "discord",
     label: "Discord",
-    version: "1.0.0",
+    version: "1.1.0",
     credentials: [
       { id: "botToken", env: "DISCORD_BOT_TOKEN", label: "Bot token", secret: true },
       { id: "applicationId", env: "DISCORD_APPLICATION_ID", label: "Application ID", secret: false }
@@ -48,7 +48,7 @@ export const CONNECTORS = {
   http: {
     id: "http",
     label: "HTTP",
-    version: "1.0.0",
+    version: "1.1.0",
     credentials: [],
     triggers: [],
     actions: [
@@ -63,7 +63,7 @@ export const CONNECTORS = {
   core: {
     id: "core",
     label: "Logic",
-    version: "1.0.0",
+    version: "1.1.0",
     credentials: [],
     triggers: [],
     actions: [
@@ -129,6 +129,9 @@ export function connectorVersionsForProject(project) {
       if (step.type === "condition") {
         walk(step.then);
         walk(step.else);
+      }
+      if (step.type === "repeat") {
+        walk(step.steps);
       }
     }
   };
