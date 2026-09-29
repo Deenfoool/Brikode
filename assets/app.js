@@ -1,14 +1,16 @@
 import { createProject, migrateProject, normalizeProject, projectToJson, validateProject } from "./ir.js";
 import { listProjects, getProject, saveProject, deleteProject, duplicateProject, getSetting, setSetting } from "./db.js";
-import { createBlocksWorkspace, disposeBlocksWorkspace, projectToWorkspace, updateBlockSearch, workspaceToProject } from "./blocks.js";
+import { applyBlockDiagnostics, createBlocksWorkspace, disposeBlocksWorkspace, projectToWorkspace, updateBlockSearch, workspaceToProject } from "./blocks.js";
 import { createCodeEditor } from "./code-editor.js";
 import { parseDsl, projectToDsl } from "./dsl.js";
 import { simulateProject } from "./simulator.js";
 import { exportReadiness, exportSelfHosted } from "./exporter.js";
-import { debounce, downloadBlob, uid } from "./utils.js";
+import { debounce, downloadBlob, renderTemplate, uid } from "./utils.js";
 
 const app = document.querySelector("#app");
 const cloudDialog = document.querySelector("#cloudDialog");
+const settingsDialog = document.querySelector("#settingsDialog");
+const dataDialog = document.querySelector("#dataDialog");
 const toastRegion = document.querySelector("#toastRegion");
 
 const state = {
@@ -127,6 +129,7 @@ async function renderHome() {
         </a>
         <div class="home-actions">
           <button class="icon-button" id="themeButton" title="Toggle theme" aria-label="Toggle theme">◐</button>
+          <button class="button" id="settingsButton">Settings</button>
           <a class="button" href="https://github.com/Deenfoool/Brikode/blob/main/ROADMAP.md">Roadmap</a>
         </div>
       </header>
@@ -163,6 +166,7 @@ async function renderHome() {
   `;
 
   document.querySelector("#themeButton").addEventListener("click", toggleTheme);
+  document.querySelector("#settingsButton").addEventListener("click", openSettings);
   document.querySelector("#cloudHomeButton").addEventListener("click", () => cloudDialog.showModal());
   document.querySelector("#newProjectButton").addEventListener("click", async () => {
     const name = prompt("Project name", "My bot");
@@ -251,8 +255,10 @@ function diagnosticsHtml() {
 }
 
 function updateDiagnostics() {
+  const projectDiagnostics = state.project ? validateProject(state.project) : [];
   const container = document.querySelector("#diagnosticContent");
   if (container) container.innerHTML = diagnosticsHtml();
+  applyBlockDiagnostics(state.workspace, projectDiagnostics);
 }
 
 function defaultPayload(project) {
@@ -301,12 +307,19 @@ function renderEditorShell() {
           <section class="pane pane-blocks" data-pane="blocks">
             <div class="blocks-toolbar">
               <input class="search-input" id="blockSearch" type="search" placeholder="Search blocks…" aria-label="Search blocks">
-              <span class="project-meta">Drag a trigger first, then connect actions below it.</span>
+              <button class="button" id="undoButton">Undo</button>
+              <button class="button" id="redoButton">Redo</button>
+              <button class="button" id="dataButton">Data paths</button>
             </div>
             <div class="blockly-host" id="blocklyDiv"></div>
           </section>
 
           <section class="pane code-pane" data-pane="code" hidden>
+            <div class="code-toolbar">
+              <button class="button" id="formatCodeButton">Format DSL</button>
+              <button class="button" id="codeDataButton">Data paths</button>
+              <span class="project-meta">Supported DSL round-trips through the same Workflow IR.</span>
+            </div>
             <div class="code-host" id="codeEditor"></div>
             <div class="dsl-help">
               Brikode DSL supports <code>TRIGGER</code>, <code>IF / ELSE / END</code>,
@@ -438,12 +451,28 @@ async function openProject(id) {
   document.querySelector("#blockSearch").addEventListener("input", event => {
     updateBlockSearch(state.workspace, event.target.value);
   });
+  document.querySelector("#undoButton").addEventListener("click", () => state.workspace?.undo?.(false));
+  document.querySelector("#redoButton").addEventListener("click", () => state.workspace?.undo?.(true));
+  document.querySelector("#dataButton").addEventListener("click", openDataPaths);
 
   state.codeEditor = await createCodeEditor(
     document.querySelector("#codeEditor"),
     projectToDsl(state.project),
     codeChanged
   );
+
+  document.querySelector("#formatCodeButton").addEventListener("click", () => {
+    const parsed = parseDsl(state.codeEditor?.getValue?.() || "", state.project.name);
+    if (parsed.diagnostics.some(item => item.severity === "error")) {
+      toast("Fix DSL errors before formatting.");
+      return;
+    }
+    parsed.project.id = state.project.id;
+    parsed.project.metadata.createdAt = state.project.metadata.createdAt;
+    state.codeEditor?.setValue?.(projectToDsl(parsed.project));
+    toast("DSL formatted.");
+  });
+  document.querySelector("#codeDataButton").addEventListener("click", openDataPaths);
 
   document.querySelectorAll("[data-tab]").forEach(button => {
     button.addEventListener("click", () => switchTab(button.dataset.tab));
@@ -586,3 +615,92 @@ bootstrap().catch(error => {
     </main>
   `;
 });
+
+
+function collectDataPaths(project) {
+  const paths = new Set(["trigger"]);
+  const payload = defaultPayload(project);
+
+  const walkObject = (value, prefix, depth = 0) => {
+    if (depth > 4 || value == null || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      const path = prefix ? prefix + "." + key : key;
+      paths.add(path);
+      walkObject(child, path, depth + 1);
+    }
+  };
+  walkObject(payload, "trigger");
+
+  const walkSteps = steps => {
+    for (const step of steps || []) {
+      if (step.type === "repeat") {
+        paths.add("vars.loopIndex");
+        walkSteps(step.steps);
+        continue;
+      }
+      if (step.type === "condition") {
+        walkSteps(step.then);
+        walkSteps(step.else);
+        continue;
+      }
+      if (step.action === "core.setVariable" && step.config?.name) {
+        paths.add("vars." + step.config.name);
+      }
+      if (step.action === "http.request") {
+        const name = step.config?.as || "response";
+        ["status", "ok", "body", "headers", "error"].forEach(key => paths.add("vars." + name + "." + key));
+      }
+      if (step.id) paths.add("steps." + step.id);
+    }
+  };
+  walkSteps(project.steps);
+  return [...paths].sort();
+}
+
+function openDataPaths() {
+  if (!state.project) return;
+  const list = document.querySelector("#dataPathList");
+  const paths = collectDataPaths(state.project);
+  list.innerHTML = paths.map(path =>
+    '<button type="button" class="data-chip" data-copy-path="' + escapeHtml(path) + '">' + escapeHtml(path) + "</button>"
+  ).join("");
+
+  const input = document.querySelector("#templatePreviewInput");
+  const output = document.querySelector("#templatePreviewOutput");
+  const refresh = () => {
+    output.textContent = renderTemplate(input.value, {
+      trigger: defaultPayload(state.project),
+      vars: { response: { status: 200, ok: true, body: { demo: true } }, loopIndex: 0 },
+      steps: {}
+    });
+  };
+
+  list.onclick = async event => {
+    const button = event.target.closest("[data-copy-path]");
+    if (!button) return;
+    const template = "{{" + button.dataset.copyPath + "}}";
+    try {
+      await navigator.clipboard.writeText(template);
+      toast("Copied " + template);
+    } catch {
+      input.value = template;
+      refresh();
+      input.select();
+      toast("Clipboard permission unavailable; path placed in preview field.");
+    }
+  };
+
+  input.oninput = refresh;
+  refresh();
+  dataDialog.showModal();
+}
+
+function openSettings() {
+  const select = document.querySelector("#themeSelect");
+  select.value = state.theme;
+  select.onchange = async () => {
+    applyTheme(select.value);
+    await setSetting("theme", select.value);
+  };
+  settingsDialog.showModal();
+}

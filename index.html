@@ -17,6 +17,45 @@
 
   <div id="app" class="app-root" aria-live="polite"></div>
 
+  <dialog id="settingsDialog" class="modal">
+    <form method="dialog" class="modal-card" id="settingsForm">
+      <div class="eyebrow">SETTINGS</div>
+      <h2>Brikode settings</h2>
+      <label class="settings-field">
+        <span>Theme</span>
+        <select id="themeSelect" class="text-input">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </label>
+      <div class="dependency-list">
+        <span>Blockly <strong>13.2.0</strong></span>
+        <span>Monaco <strong>0.57.0</strong></span>
+        <span>JSZip <strong>3.10.2</strong></span>
+      </div>
+      <div class="modal-actions">
+        <button class="button button-primary" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dataDialog" class="modal">
+    <form method="dialog" class="modal-card modal-wide">
+      <div class="eyebrow">DATA PATHS</div>
+      <h2>Workflow data</h2>
+      <p>Click a path to copy its template form. Paths are resolved safely without evaluating JavaScript.</p>
+      <div id="dataPathList" class="data-path-list"></div>
+      <label class="settings-field">
+        <span>Template preview</span>
+        <input id="templatePreviewInput" class="text-input" value="Hello {{trigger.text}}">
+      </label>
+      <pre id="templatePreviewOutput" class="preview-output"></pre>
+      <div class="modal-actions">
+        <button class="button button-primary" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="cloudDialog" class="modal">
     <form method="dialog" class="modal-card">
       <div class="eyebrow">CLOUD DEPLOY</div>
