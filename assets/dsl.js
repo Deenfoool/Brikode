@@ -20,6 +20,13 @@ function actionToLines(step, indent, lines) {
   const pad = "  ".repeat(indent);
   lines.push(pad + "# @id " + stableId(step.id));
 
+  if (step.type === "repeat") {
+    lines.push(pad + "REPEAT " + String(Number(step.times) || 1));
+    for (const child of step.steps || []) actionToLines(child, indent + 1, lines);
+    lines.push(pad + "END");
+    return;
+  }
+
   if (step.type === "condition") {
     const expr = step.expression || {};
     lines.push(
@@ -45,17 +52,34 @@ function actionToLines(step, indent, lines) {
     case "telegram.sendFile":
       lines.push(pad + "TELEGRAM_FILE " + quote(config.url || "") + " CAPTION " + quote(config.caption || ""));
       break;
+    case "telegram.sendButtons":
+      lines.push(pad + "TELEGRAM_BUTTONS " + quote(config.text || "") + " BUTTONS " + quote(config.buttons || "[]"));
+      break;
     case "discord.sendMessage":
       lines.push(pad + "DISCORD_SEND " + quote(config.text || ""));
       break;
-    case "http.request":
+    case "discord.reply":
+      lines.push(pad + "DISCORD_REPLY " + quote(config.text || ""));
+      break;
+    case "discord.sendEmbed":
+      lines.push(pad + "DISCORD_EMBED " + quote(config.title || "") + " DESCRIPTION " + quote(config.description || ""));
+      break;
+    case "http.request": {
+      const options = {
+        query: config.query || "{}",
+        headers: config.headers || "{}",
+        body: config.body || "",
+        timeoutMs: Number(config.timeoutMs) || 10000
+      };
       lines.push(
         pad + "HTTP " +
         String(config.method || "GET").toUpperCase() + " " +
         quote(config.url || "") +
-        " AS " + String(config.as || "response")
+        " AS " + String(config.as || "response") +
+        " WITH " + quote(JSON.stringify(options))
       );
       break;
+    }
     case "core.delay":
       lines.push(pad + "DELAY " + String(Number(config.ms) || 0));
       break;
@@ -131,16 +155,53 @@ function parseAction(line, lineNumber, nodeId) {
     config: { url: unquote(match[1]), caption: unquote(match[2]) }
   };
 
-  match = line.match(new RegExp("^DISCORD_SEND\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id, type: "action", action: "discord.sendMessage", config: { text: unquote(match[1]) } };
-
-  match = line.match(new RegExp("^HTTP\\s+(GET|POST|PUT|PATCH|DELETE)\\s+(" + QUOTED + ")\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)$", "i"));
+  match = line.match(new RegExp("^TELEGRAM_BUTTONS\\s+(" + QUOTED + ")\\s+BUTTONS\\s+(" + QUOTED + ")$", "i"));
   if (match) return {
     id,
     type: "action",
-    action: "http.request",
-    config: { method: match[1].toUpperCase(), url: unquote(match[2]), as: match[3] }
+    action: "telegram.sendButtons",
+    config: { text: unquote(match[1]), buttons: unquote(match[2]) }
   };
+
+  match = line.match(new RegExp("^DISCORD_SEND\\s+(" + QUOTED + ")$", "i"));
+  if (match) return { id, type: "action", action: "discord.sendMessage", config: { text: unquote(match[1]) } };
+
+  match = line.match(new RegExp("^DISCORD_REPLY\\s+(" + QUOTED + ")$", "i"));
+  if (match) return { id, type: "action", action: "discord.reply", config: { text: unquote(match[1]) } };
+
+  match = line.match(new RegExp("^DISCORD_EMBED\\s+(" + QUOTED + ")\\s+DESCRIPTION\\s+(" + QUOTED + ")$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "discord.sendEmbed",
+    config: { title: unquote(match[1]), description: unquote(match[2]) }
+  };
+
+  match = line.match(new RegExp("^HTTP\\s+(GET|POST|PUT|PATCH|DELETE)\\s+(" + QUOTED + ")\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+WITH\\s+(" + QUOTED + "))?$", "i"));
+  if (match) {
+    let options = {};
+    if (match[4]) {
+      try {
+        options = JSON.parse(unquote(match[4]));
+      } catch {
+        throw new Error("Line " + lineNumber + ": HTTP WITH must contain encoded JSON options.");
+      }
+    }
+    return {
+      id,
+      type: "action",
+      action: "http.request",
+      config: {
+        method: match[1].toUpperCase(),
+        url: unquote(match[2]),
+        as: match[3],
+        query: options.query || "{}",
+        headers: options.headers || "{}",
+        body: options.body || "",
+        timeoutMs: Number(options.timeoutMs) || 10000
+      }
+    };
+  }
 
   match = line.match(/^DELAY\s+(\d+)$/i);
   if (match) return { id, type: "action", action: "core.delay", config: { ms: Number(match[1]) } };
@@ -165,7 +226,7 @@ function parseAction(line, lineNumber, nodeId) {
 export function parseDsl(source, fallbackName = "Untitled bot") {
   const diagnostics = [];
   const project = createProject(fallbackName);
-  const stack = [{ steps: project.steps, condition: null }];
+  const stack = [{ steps: project.steps, owner: null, kind: "root" }];
   const lines = String(source || "").split(/\r?\n/);
   let sawWorkflow = false;
   let sawTrigger = false;
@@ -261,6 +322,20 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
       continue;
     }
 
+    match = line.match(/^REPEAT\\s+(\\d+)$/i);
+    if (match) {
+      const repeat = {
+        id: stableId(pendingId),
+        type: "repeat",
+        times: Number(match[1]),
+        steps: []
+      };
+      pendingId = null;
+      stack.at(-1).steps.push(repeat);
+      stack.push({ steps: repeat.steps, owner: repeat, kind: "repeat" });
+      continue;
+    }
+
     match = line.match(new RegExp("^IF\\s+(" + QUOTED + ")\\s+(EQUALS|CONTAINS|NOTEQUALS|EXISTS)\\s+(" + QUOTED + ")$", "i"));
     if (match) {
       const condition = {
@@ -276,17 +351,17 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
       };
       pendingId = null;
       stack.at(-1).steps.push(condition);
-      stack.push({ steps: condition.then, condition, branch: "then" });
+      stack.push({ steps: condition.then, owner: condition, kind: "condition", branch: "then" });
       continue;
     }
 
     if (/^ELSE$/i.test(line)) {
-      if (stack.length === 1 || !stack.at(-1).condition) {
+      if (stack.length === 1 || stack.at(-1).kind !== "condition") {
         error(lineNumber, "ELSE has no matching IF.");
         continue;
       }
       const current = stack.pop();
-      stack.push({ steps: current.condition.else, condition: current.condition, branch: "else" });
+      stack.push({ steps: current.owner.else, owner: current.owner, kind: "condition", branch: "else" });
       continue;
     }
 
