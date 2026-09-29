@@ -32,7 +32,8 @@ export const CONNECTORS = {
     actions: [
       { id: "sendMessage", label: "Send message", inputs: { text: "string", channelId: "string?" }, outputs: { response: "object" } },
       { id: "reply", label: "Reply", inputs: { text: "string" }, outputs: { response: "object" } },
-      { id: "sendEmbed", label: "Send embed", inputs: { title: "string", description: "string" }, outputs: { response: "object" } }
+      { id: "sendEmbed", label: "Send embed", inputs: { title: "string", description: "string" }, outputs: { response: "object" } },
+      { id: "sendButtons", label: "Send buttons", inputs: { text: "string", buttons: "json", channelId: "string?" }, outputs: { response: "object" } }
     ]
   },
   webhook: {
@@ -70,6 +71,7 @@ export const CONNECTORS = {
       { id: "delay", label: "Delay", inputs: { ms: "number" }, outputs: {} },
       { id: "log", label: "Log", inputs: { message: "string" }, outputs: {} },
       { id: "setVariable", label: "Set variable", inputs: { name: "string", value: "any" }, outputs: {} },
+      { id: "convert", label: "Convert value", inputs: { name: "string", value: "any", target: "string" }, outputs: { value: "any" } },
       { id: "customCode", label: "Custom JavaScript", inputs: { source: "string" }, outputs: { result: "any" } }
     ]
   }

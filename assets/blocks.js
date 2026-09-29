@@ -107,6 +107,18 @@ const DEFINITIONS = [
     colour: 265
   },
   {
+    type: "brikode_discord_buttons",
+    message0: "Discord  send %1",
+    args0: [{ type: "field_input", name: "TEXT", text: "Choose an option" }],
+    message1: "buttons JSON %1",
+    args1: [{ type: "field_input", name: "BUTTONS", text: "[[{\"label\":\"OK\",\"customId\":\"ok\",\"style\":\"primary\"}]]" }],
+    message2: "channel ID (optional) %1",
+    args2: [{ type: "field_input", name: "CHANNEL", text: "" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 265
+  },
+  {
     type: "brikode_http_request",
     message0: "HTTP %1 %2",
     args0: [
@@ -179,6 +191,19 @@ const DEFINITIONS = [
     colour: 55
   },
   {
+    type: "brikode_convert",
+    message0: "convert %1",
+    args0: [{ type: "field_input", name: "VALUE", text: "{{trigger.text}}" }],
+    message1: "to %1 as variable %2",
+    args1: [
+      { type: "field_dropdown", name: "TARGET", options: [["string", "string"], ["number", "number"], ["boolean", "boolean"], ["JSON", "json"]] },
+      { type: "field_input", name: "NAME", text: "converted" }
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 165
+  },
+  {
     type: "brikode_repeat",
     message0: "repeat %1 times",
     args0: [{ type: "field_number", name: "TIMES", value: 2, min: 1, max: 1000, precision: 1 }],
@@ -232,7 +257,8 @@ const TOOLBOX = {
       contents: [
         { kind: "block", type: "brikode_discord_send" },
         { kind: "block", type: "brikode_discord_reply" },
-        { kind: "block", type: "brikode_discord_embed" }
+        { kind: "block", type: "brikode_discord_embed" },
+        { kind: "block", type: "brikode_discord_buttons" }
       ]
     },
     {
@@ -251,6 +277,7 @@ const TOOLBOX = {
         { kind: "block", type: "brikode_if" },
         { kind: "block", type: "brikode_repeat" },
         { kind: "block", type: "brikode_set_variable" },
+        { kind: "block", type: "brikode_convert" },
         { kind: "block", type: "brikode_delay" },
         { kind: "block", type: "brikode_log" }
       ]
@@ -279,10 +306,12 @@ const SEARCH_INDEX = [
   ["discord send message", "brikode_discord_send"],
   ["discord reply message", "brikode_discord_reply"],
   ["discord embed card", "brikode_discord_embed"],
+  ["discord buttons components", "brikode_discord_buttons"],
   ["http api request get post put patch delete", "brikode_http_request"],
   ["if condition contains equals", "brikode_if"],
   ["repeat loop times", "brikode_repeat"],
   ["variable set", "brikode_set_variable"],
+  ["convert cast type string number boolean json", "brikode_convert"],
   ["delay wait", "brikode_delay"],
   ["log debug", "brikode_log"],
   ["custom javascript code", "brikode_custom_js"]
@@ -440,6 +469,14 @@ function compileChain(firstBlock) {
           config: { title: field(block, "TITLE"), description: field(block, "DESCRIPTION"), channelId: field(block, "CHANNEL") }
         };
         break;
+      case "brikode_discord_buttons":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "discord.sendButtons",
+          config: { text: field(block, "TEXT"), buttons: field(block, "BUTTONS", "[]"), channelId: field(block, "CHANNEL") }
+        };
+        break;
       case "brikode_http_request":
         node = {
           id: block.id,
@@ -478,6 +515,14 @@ function compileChain(firstBlock) {
           type: "action",
           action: "core.setVariable",
           config: { name: field(block, "NAME"), value: field(block, "VALUE") }
+        };
+        break;
+      case "brikode_convert":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "core.convert",
+          config: { value: field(block, "VALUE"), target: field(block, "TARGET", "string"), name: field(block, "NAME", "converted") }
         };
         break;
       case "brikode_repeat":
@@ -544,10 +589,12 @@ const ACTION_BLOCKS = {
   "discord.sendMessage": ["brikode_discord_send", { TEXT: "text", CHANNEL: "channelId" }],
   "discord.reply": ["brikode_discord_reply", { TEXT: "text" }],
   "discord.sendEmbed": ["brikode_discord_embed", { TITLE: "title", DESCRIPTION: "description", CHANNEL: "channelId" }],
+  "discord.sendButtons": ["brikode_discord_buttons", { TEXT: "text", BUTTONS: "buttons", CHANNEL: "channelId" }],
   "http.request": ["brikode_http_request", { METHOD: "method", URL: "url", QUERY: "query", HEADERS: "headers", BODY: "body", TIMEOUT: "timeoutMs", AS: "as" }],
   "core.delay": ["brikode_delay", { MS: "ms" }],
   "core.log": ["brikode_log", { MESSAGE: "message" }],
   "core.setVariable": ["brikode_set_variable", { NAME: "name", VALUE: "value" }],
+  "core.convert": ["brikode_convert", { VALUE: "value", TARGET: "target", NAME: "name" }],
   "core.customCode": ["brikode_custom_js", { SOURCE: "source" }]
 };
 

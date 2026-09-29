@@ -173,6 +173,27 @@ function validateStep(step, diagnostics, ids) {
     }
   }
 
+  if (step.action === "discord.sendButtons") {
+    const source = String(step.config?.buttons || "");
+    if (source && !source.includes("{{")) {
+      try {
+        const rows = JSON.parse(source);
+        if (!Array.isArray(rows) || rows.some(row => !Array.isArray(row))) throw new Error("not rows");
+      } catch {
+        pushDiagnostic(diagnostics, "error", "discord.buttons", "Discord buttons must be a JSON array of button rows.", step.id);
+      }
+    }
+  }
+
+  if (step.action === "core.convert") {
+    if (!["string", "number", "boolean", "json"].includes(String(step.config?.target || ""))) {
+      pushDiagnostic(diagnostics, "error", "convert.target", "Convert target must be string, number, boolean or json.", step.id);
+    }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(step.config?.name || ""))) {
+      pushDiagnostic(diagnostics, "error", "convert.name", "Converted value needs a valid variable name.", step.id);
+    }
+  }
+
   if (step.action === "core.delay") {
     const ms = Number(step.config?.ms);
     if (!Number.isFinite(ms) || ms < 0) {
