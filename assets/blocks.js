@@ -61,9 +61,37 @@ const DEFINITIONS = [
     colour: 205
   },
   {
+    type: "brikode_telegram_buttons",
+    message0: "Telegram  send %1",
+    args0: [{ type: "field_input", name: "TEXT", text: "Choose an option" }],
+    message1: "inline buttons JSON %1",
+    args1: [{ type: "field_input", name: "BUTTONS", text: "[[{\"text\":\"OK\",\"callback_data\":\"ok\"}]]" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 205
+  },
+  {
     type: "brikode_discord_send",
     message0: "Discord  send %1",
     args0: [{ type: "field_input", name: "TEXT", text: "Hello {{trigger.text}}" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 265
+  },
+  {
+    type: "brikode_discord_reply",
+    message0: "Discord  reply %1",
+    args0: [{ type: "field_input", name: "TEXT", text: "Reply to {{trigger.text}}" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 265
+  },
+  {
+    type: "brikode_discord_embed",
+    message0: "Discord  embed title %1",
+    args0: [{ type: "field_input", name: "TITLE", text: "Brikode" }],
+    message1: "description %1",
+    args1: [{ type: "field_input", name: "DESCRIPTION", text: "Hello {{trigger.text}}" }],
     previousStatement: null,
     nextStatement: null,
     colour: 265
@@ -79,8 +107,16 @@ const DEFINITIONS = [
       },
       { type: "field_input", name: "URL", text: "https://api.example.com" }
     ],
-    message1: "save response as %1",
-    args1: [{ type: "field_input", name: "AS", text: "response" }],
+    message1: "query JSON %1",
+    args1: [{ type: "field_input", name: "QUERY", text: "{}" }],
+    message2: "headers JSON %1",
+    args2: [{ type: "field_input", name: "HEADERS", text: "{}" }],
+    message3: "body / template %1",
+    args3: [{ type: "field_input", name: "BODY", text: "" }],
+    message4: "timeout %1 ms",
+    args4: [{ type: "field_number", name: "TIMEOUT", value: 10000, min: 100, max: 120000, precision: 100 }],
+    message5: "save response as %1",
+    args5: [{ type: "field_input", name: "AS", text: "response" }],
     previousStatement: null,
     nextStatement: null,
     colour: 25
@@ -133,6 +169,16 @@ const DEFINITIONS = [
     colour: 55
   },
   {
+    type: "brikode_repeat",
+    message0: "repeat %1 times",
+    args0: [{ type: "field_number", name: "TIMES", value: 2, min: 1, max: 1000, precision: 1 }],
+    message1: "do %1",
+    args1: [{ type: "input_statement", name: "DO" }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 55
+  },
+  {
     type: "brikode_custom_js",
     message0: "custom JavaScript %1",
     args0: [{ type: "field_input", name: "SOURCE", text: "return context;" }],
@@ -165,7 +211,8 @@ const TOOLBOX = {
       colour: "#3f9bd8",
       contents: [
         { kind: "block", type: "brikode_telegram_send" },
-        { kind: "block", type: "brikode_telegram_file" }
+        { kind: "block", type: "brikode_telegram_file" },
+        { kind: "block", type: "brikode_telegram_buttons" }
       ]
     },
     {
@@ -173,7 +220,9 @@ const TOOLBOX = {
       name: "Discord",
       colour: "#7757d8",
       contents: [
-        { kind: "block", type: "brikode_discord_send" }
+        { kind: "block", type: "brikode_discord_send" },
+        { kind: "block", type: "brikode_discord_reply" },
+        { kind: "block", type: "brikode_discord_embed" }
       ]
     },
     {
@@ -190,6 +239,7 @@ const TOOLBOX = {
       colour: "#48a08b",
       contents: [
         { kind: "block", type: "brikode_if" },
+        { kind: "block", type: "brikode_repeat" },
         { kind: "block", type: "brikode_set_variable" },
         { kind: "block", type: "brikode_delay" },
         { kind: "block", type: "brikode_log" }
@@ -215,9 +265,13 @@ const SEARCH_INDEX = [
   ["webhook incoming trigger", "brikode_trigger_webhook"],
   ["telegram send message", "brikode_telegram_send"],
   ["telegram send file", "brikode_telegram_file"],
+  ["telegram inline buttons callback", "brikode_telegram_buttons"],
   ["discord send message", "brikode_discord_send"],
+  ["discord reply message", "brikode_discord_reply"],
+  ["discord embed card", "brikode_discord_embed"],
   ["http api request get post put patch delete", "brikode_http_request"],
   ["if condition contains equals", "brikode_if"],
+  ["repeat loop times", "brikode_repeat"],
   ["variable set", "brikode_set_variable"],
   ["delay wait", "brikode_delay"],
   ["log debug", "brikode_log"],
@@ -344,12 +398,36 @@ function compileChain(firstBlock) {
           config: { url: field(block, "URL"), caption: field(block, "CAPTION") }
         };
         break;
+      case "brikode_telegram_buttons":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "telegram.sendButtons",
+          config: { text: field(block, "TEXT"), buttons: field(block, "BUTTONS", "[]") }
+        };
+        break;
       case "brikode_discord_send":
         node = {
           id: block.id,
           type: "action",
           action: "discord.sendMessage",
           config: { text: field(block, "TEXT") }
+        };
+        break;
+      case "brikode_discord_reply":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "discord.reply",
+          config: { text: field(block, "TEXT") }
+        };
+        break;
+      case "brikode_discord_embed":
+        node = {
+          id: block.id,
+          type: "action",
+          action: "discord.sendEmbed",
+          config: { title: field(block, "TITLE"), description: field(block, "DESCRIPTION") }
         };
         break;
       case "brikode_http_request":
@@ -360,6 +438,10 @@ function compileChain(firstBlock) {
           config: {
             method: field(block, "METHOD", "GET"),
             url: field(block, "URL"),
+            query: field(block, "QUERY", "{}"),
+            headers: field(block, "HEADERS", "{}"),
+            body: field(block, "BODY", ""),
+            timeoutMs: Number(field(block, "TIMEOUT", 10000)),
             as: field(block, "AS", "response")
           }
         };
@@ -386,6 +468,14 @@ function compileChain(firstBlock) {
           type: "action",
           action: "core.setVariable",
           config: { name: field(block, "NAME"), value: field(block, "VALUE") }
+        };
+        break;
+      case "brikode_repeat":
+        node = {
+          id: block.id,
+          type: "repeat",
+          times: Number(field(block, "TIMES", 1)),
+          steps: compileChain(block.getInputTargetBlock("DO"))
         };
         break;
       case "brikode_custom_js":
@@ -440,8 +530,11 @@ const TRIGGER_BLOCKS = {
 const ACTION_BLOCKS = {
   "telegram.sendMessage": ["brikode_telegram_send", { TEXT: "text" }],
   "telegram.sendFile": ["brikode_telegram_file", { URL: "url", CAPTION: "caption" }],
+  "telegram.sendButtons": ["brikode_telegram_buttons", { TEXT: "text", BUTTONS: "buttons" }],
   "discord.sendMessage": ["brikode_discord_send", { TEXT: "text" }],
-  "http.request": ["brikode_http_request", { METHOD: "method", URL: "url", AS: "as" }],
+  "discord.reply": ["brikode_discord_reply", { TEXT: "text" }],
+  "discord.sendEmbed": ["brikode_discord_embed", { TITLE: "title", DESCRIPTION: "description" }],
+  "http.request": ["brikode_http_request", { METHOD: "method", URL: "url", QUERY: "query", HEADERS: "headers", BODY: "body", TIMEOUT: "timeoutMs", AS: "as" }],
   "core.delay": ["brikode_delay", { MS: "ms" }],
   "core.log": ["brikode_log", { MESSAGE: "message" }],
   "core.setVariable": ["brikode_set_variable", { NAME: "name", VALUE: "value" }],
@@ -465,6 +558,16 @@ function setMappedFields(block, config, map) {
 }
 
 function renderStep(workspace, step) {
+  if (step.type === "repeat") {
+    const block = createBlock(workspace, "brikode_repeat", step.id);
+    block.setFieldValue(String(step.times || 1), "TIMES");
+    const first = renderChain(workspace, step.steps || []);
+    if (first?.previousConnection) {
+      block.getInput("DO").connection.connect(first.previousConnection);
+    }
+    return block;
+  }
+
   if (step.type === "condition") {
     const block = createBlock(workspace, "brikode_if", step.id);
     block.setFieldValue(String(step.expression?.left || "trigger.text"), "LEFT");
@@ -535,4 +638,21 @@ export function projectToWorkspace(project, workspace) {
 
 export function disposeBlocksWorkspace(workspace) {
   workspace?.dispose?.();
+}
+
+
+export function applyBlockDiagnostics(workspace, diagnostics) {
+  if (!workspace) return;
+  for (const block of workspace.getAllBlocks(false)) {
+    block.setWarningText(null);
+  }
+  const grouped = new Map();
+  for (const item of diagnostics || []) {
+    if (!item.nodeId) continue;
+    if (!grouped.has(item.nodeId)) grouped.set(item.nodeId, []);
+    grouped.get(item.nodeId).push(item.message);
+  }
+  for (const [nodeId, messages] of grouped) {
+    workspace.getBlockById(nodeId)?.setWarningText(messages.join("\n"));
+  }
 }
