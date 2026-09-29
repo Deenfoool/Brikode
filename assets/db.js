@@ -63,20 +63,55 @@ function requestToPromise(request) {
   });
 }
 
+function recoveryProjects() {
+  return Object.keys(localStorage)
+    .filter(key => key.startsWith(SHADOW_PREFIX))
+    .map(key => {
+      try {
+        return migrateProject(JSON.parse(localStorage.getItem(key)));
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function newestProject(primary, recovery) {
+  if (!primary) return recovery || null;
+  if (!recovery) return primary;
+  return String(recovery.metadata?.updatedAt || "") > String(primary.metadata?.updatedAt || "")
+    ? recovery
+    : primary;
+}
+
 export async function listProjects() {
   const db = await openDatabase();
+  let stored = [];
+
   if (!db) {
-    const items = Object.keys(localStorage)
+    stored = Object.keys(localStorage)
       .filter(key => key.startsWith("brikode:project:"))
-      .map(key => JSON.parse(localStorage.getItem(key)))
-      .map(migrateProject);
-    return items.sort((a, b) => String(b.metadata.updatedAt).localeCompare(String(a.metadata.updatedAt)));
+      .map(key => {
+        try {
+          return migrateProject(JSON.parse(localStorage.getItem(key)));
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } else {
+    const tx = db.transaction(PROJECT_STORE, "readonly");
+    const request = tx.objectStore(PROJECT_STORE).getAll();
+    stored = (await requestToPromise(request)).map(migrateProject);
   }
 
-  const tx = db.transaction(PROJECT_STORE, "readonly");
-  const request = tx.objectStore(PROJECT_STORE).getAll();
-  const items = (await requestToPromise(request)).map(migrateProject);
-  return items.sort((a, b) => String(b.metadata.updatedAt).localeCompare(String(a.metadata.updatedAt)));
+  const byId = new Map(stored.map(project => [project.id, project]));
+  for (const recovery of recoveryProjects()) {
+    byId.set(recovery.id, newestProject(byId.get(recovery.id), recovery));
+  }
+
+  return [...byId.values()]
+    .sort((a, b) => String(b.metadata.updatedAt).localeCompare(String(a.metadata.updatedAt)));
 }
 
 export async function getProject(id) {
@@ -90,12 +125,18 @@ export async function getProject(id) {
     raw = await requestToPromise(tx.objectStore(PROJECT_STORE).get(id));
   }
 
-  if (!raw) {
-    const recovery = localStorage.getItem(SHADOW_PREFIX + id);
-    if (recovery) raw = JSON.parse(recovery);
+  const recoveryRaw = localStorage.getItem(SHADOW_PREFIX + id);
+  let recovery = null;
+  if (recoveryRaw) {
+    try {
+      recovery = migrateProject(JSON.parse(recoveryRaw));
+    } catch {
+      recovery = null;
+    }
   }
 
-  return raw ? migrateProject(raw) : null;
+  const primary = raw ? migrateProject(raw) : null;
+  return newestProject(primary, recovery);
 }
 
 export async function saveProject(project) {
