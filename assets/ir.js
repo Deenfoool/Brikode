@@ -58,7 +58,9 @@ export function migrateProject(raw) {
   project.metadata ||= {};
   project.metadata.createdAt ||= new Date().toISOString();
   project.metadata.updatedAt ||= project.metadata.createdAt;
-  project.connectorVersions = connectorVersionsForProject(project);
+  project.connectorVersions = project.connectorVersions && typeof project.connectorVersions === "object"
+    ? project.connectorVersions
+    : connectorVersionsForProject(project);
 
   return project;
 }
@@ -102,6 +104,15 @@ function validateStep(step, diagnostics, ids) {
     pushDiagnostic(diagnostics, "error", "step.duplicateId", "Duplicate node id: " + step.id, step.id);
   } else {
     ids.add(step.id);
+  }
+
+  if (step.type === "repeat") {
+    const times = Number(step.times);
+    if (!Number.isInteger(times) || times < 1 || times > 1000) {
+      pushDiagnostic(diagnostics, "error", "repeat.times", "Repeat count must be an integer from 1 to 1000.", step.id);
+    }
+    for (const child of step.steps || []) validateStep(child, diagnostics, ids);
+    return;
   }
 
   if (step.type === "condition") {
@@ -168,6 +179,19 @@ export function validateProject(raw) {
   }
 
   validateTrigger(project.trigger, diagnostics);
+
+  for (const [connectorId, savedVersion] of Object.entries(project.connectorVersions || {})) {
+    const currentVersion = CONNECTORS[connectorId]?.version;
+    if (currentVersion && savedVersion !== currentVersion) {
+      pushDiagnostic(
+        diagnostics,
+        "warning",
+        "connector.version",
+        connectorId + " project version " + savedVersion + " differs from editor version " + currentVersion + "."
+      );
+    }
+  }
+
   const ids = new Set(project.trigger?.id ? [project.trigger.id] : []);
   for (const step of project.steps) validateStep(step, diagnostics, ids);
 

@@ -13,7 +13,8 @@ export const CONNECTORS = Object.freeze({
     ],
     actions: [
       { id: "sendMessage", label: "Send message", inputs: { text: "string", chatId: "string?" }, outputs: { response: "object" } },
-      { id: "sendFile", label: "Send file", inputs: { url: "string", caption: "string?" }, outputs: { response: "object" } }
+      { id: "sendFile", label: "Send file", inputs: { url: "string", caption: "string?" }, outputs: { response: "object" } },
+      { id: "sendButtons", label: "Send inline buttons", inputs: { text: "string", buttons: "json" }, outputs: { response: "object" } }
     ]
   },
   discord: {
@@ -29,7 +30,9 @@ export const CONNECTORS = Object.freeze({
       { id: "slash", label: "Slash command", inputs: { command: "string" }, outputs: { interaction: "object", text: "string", channelId: "string" } }
     ],
     actions: [
-      { id: "sendMessage", label: "Send message", inputs: { text: "string", channelId: "string?" }, outputs: { response: "object" } }
+      { id: "sendMessage", label: "Send message", inputs: { text: "string", channelId: "string?" }, outputs: { response: "object" } },
+      { id: "reply", label: "Reply", inputs: { text: "string" }, outputs: { response: "object" } },
+      { id: "sendEmbed", label: "Send embed", inputs: { title: "string", description: "string" }, outputs: { response: "object" } }
     ]
   },
   webhook: {
@@ -52,7 +55,7 @@ export const CONNECTORS = Object.freeze({
       {
         id: "request",
         label: "Request",
-        inputs: { method: "string", url: "string", headers: "object?", body: "any?" },
+        inputs: { method: "string", url: "string", headers: "object?", query: "object?", body: "any?", timeoutMs: "number?" },
         outputs: { status: "number", ok: "boolean", body: "any", headers: "object" }
       }
     ]
