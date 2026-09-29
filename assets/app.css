@@ -270,7 +270,7 @@ a { color: inherit; text-decoration: none; }
 .test-log { margin-top: 14px; display: grid; gap: 7px; }
 .log-row {
   display: grid;
-  grid-template-columns: 60px 78px minmax(0, 1fr);
+  grid-template-columns: 60px 78px minmax(110px, 160px) minmax(0, 1fr);
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -388,4 +388,11 @@ a { color: inherit; text-decoration: none; }
 .preview-output { min-height: 54px; white-space: pre-wrap; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--text); font-size: 12px; }
 @media (max-width:720px) {
   .code-host { height: calc(100vh - 269px); }
+}
+
+.log-node { color: var(--accent-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) {
+  .log-row { grid-template-columns: 56px 70px minmax(0, 1fr); }
+  .log-node { grid-column: 3; }
+  .log-row > span:last-child { grid-column: 1 / -1; }
 }

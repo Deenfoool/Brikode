@@ -64,6 +64,38 @@ function envExample(project) {
   return [...new Set(lines)].join("\n") + "\n";
 }
 
+function connectorSetup(project) {
+  const sections = [];
+  if (usesConnector(project, "telegram")) {
+    sections.push([
+      "### Telegram",
+      "",
+      "1. Create or choose a bot with BotFather.",
+      "2. Put the bot token in `TELEGRAM_BOT_TOKEN`.",
+      "3. The runtime uses Telegram long polling, so no public webhook URL is required."
+    ].join("\n"));
+  }
+  if (usesConnector(project, "discord")) {
+    sections.push([
+      "### Discord",
+      "",
+      "1. Create/select an application in the Discord Developer Portal and add a bot.",
+      "2. Put its token in `DISCORD_BOT_TOKEN`.",
+      "3. Put the application ID in `DISCORD_APPLICATION_ID` when using slash commands.",
+      "4. For message triggers, enable the Message Content intent for the bot when required by your Discord application."
+    ].join("\n"));
+  }
+  if (project.trigger?.type === "webhook.incoming") {
+    sections.push([
+      "### Webhook",
+      "",
+      "The runtime listens on `PORT` (default `3000`) at path `" + (project.trigger.config?.path || "/hook") + "`.",
+      "Expose that port through your own HTTPS reverse proxy or hosting platform when the webhook must be public."
+    ].join("\n"));
+  }
+  return sections.join("\n\n") || "No connector-specific setup is required.";
+}
+
 function generatedReadme(project) {
   const env = requiredEnvForProject(project);
   const envLines = env.length
@@ -89,6 +121,10 @@ function generatedReadme(project) {
     "## Environment",
     "",
     envLines,
+    "",
+    "## Connector setup",
+    "",
+    connectorSetup(project),
     "",
     "## Workflow",
     "",

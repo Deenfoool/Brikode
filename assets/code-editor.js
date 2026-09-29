@@ -42,7 +42,7 @@ function registerLanguage(monaco) {
     tokenizer: {
       root: [
         [/^\s*#.*/, "comment"],
-        [/\b(WORKFLOW|TRIGGER|TELEGRAM_SEND|TELEGRAM_FILE|TELEGRAM_BUTTONS|BUTTONS|CAPTION|DISCORD_SEND|DISCORD_REPLY|DISCORD_EMBED|DESCRIPTION|HTTP|AS|WITH|DELAY|LOG|SET|RAW_JS|IF|ELSE|END|REPEAT)\b/, "keyword"],
+        [/\b(WORKFLOW|TRIGGER|TELEGRAM_SEND|TELEGRAM_FILE|TELEGRAM_BUTTONS|BUTTONS|CAPTION|DISCORD_SEND|DISCORD_REPLY|DISCORD_EMBED|DISCORD_BUTTONS|DESCRIPTION|HTTP|AS|WITH|DELAY|LOG|SET|CONVERT|TO|RAW_JS|IF|ELSE|END|REPEAT)\b/, "keyword"],
         [/\b(GET|POST|PUT|PATCH|DELETE|EQUALS|CONTAINS|NOTEQUALS|EXISTS)\b/, "type.keyword"],
         [/"([^"\\]|\\.)*"/, "string"],
         [/\b\d+\b/, "number"],
@@ -70,11 +70,13 @@ function registerLanguage(monaco) {
         ['TELEGRAM_BUTTONS "Choose" BUTTONS "[[{\\\"text\\\":\\\"OK\\\",\\\"callback_data\\\":\\\"ok\\\"}]]"', "Telegram inline buttons"],
         ['DISCORD_SEND "Hello {{trigger.text}}"', "Send Discord message"],
         ['DISCORD_REPLY "Got it"', "Reply to Discord message"],
-        ['DISCORD_EMBED "Title" DESCRIPTION "Description"', "Discord embed"],
+        ['DISCORD_EMBED "Title" DESCRIPTION "Description" TO ""', "Discord embed"],
+        ['DISCORD_BUTTONS "Choose" BUTTONS "[[{\\\"label\\\":\\\"OK\\\",\\\"customId\\\":\\\"ok\\\",\\\"style\\\":\\\"primary\\\"}]]" TO ""', "Discord buttons"],
         ['HTTP GET "https://api.example.com" AS response', "HTTP request"],
         ['REPEAT 3\n  LOG "{{vars.loopIndex}}"\nEND', "Repeat loop"],
         ['IF "trigger.text" CONTAINS "hello"\n  LOG "matched"\nELSE\n  LOG "not matched"\nEND', "Condition"],
         ['SET value = "{{trigger.text}}"', "Set variable"],
+        ['CONVERT "{{trigger.text}}" TO NUMBER AS numericValue', "Convert value"],
         ["DELAY 1000", "Delay"],
         ['LOG "{{trigger.text}}"', "Log value"]
       ];

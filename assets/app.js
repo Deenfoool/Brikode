@@ -342,6 +342,10 @@ function renderEditorShell() {
                 </div>
               </div>
               <div class="test-log" id="testLog"></div>
+              <div class="panel-card" id="scopeCard" hidden>
+                <h3>Resulting scope</h3>
+                <pre class="preview-output" id="testScope"></pre>
+              </div>
             </div>
           </section>
 
@@ -558,6 +562,7 @@ async function runTest() {
   button.disabled = true;
   button.textContent = "Running…";
   logContainer.innerHTML = "";
+  document.querySelector("#scopeCard").hidden = true;
 
   try {
     const result = await simulateProject(state.project, payload);
@@ -565,9 +570,13 @@ async function runTest() {
       <div class="log-row">
         <span class="log-time">+${escapeHtml(item.at)} ms</span>
         <span class="log-status status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        <code class="log-node">${escapeHtml(item.nodeId || "workflow")}</code>
         <span>${escapeHtml(item.message)}${item.data == null ? "" : "<br><code>" + escapeHtml(JSON.stringify(item.data)) + "</code>"}</span>
       </div>
     `).join("") || '<div class="diagnostic-empty">The workflow produced no log entries.</div>';
+    const scopeCard = document.querySelector("#scopeCard");
+    document.querySelector("#testScope").textContent = JSON.stringify(result.scope, null, 2);
+    scopeCard.hidden = false;
   } catch (error) {
     logContainer.innerHTML = '<div class="diagnostic-item error">' + escapeHtml(error.message) + "</div>";
   } finally {
@@ -643,7 +652,7 @@ function collectDataPaths(project) {
         walkSteps(step.else);
         continue;
       }
-      if (step.action === "core.setVariable" && step.config?.name) {
+      if ((step.action === "core.setVariable" || step.action === "core.convert") && step.config?.name) {
         paths.add("vars." + step.config.name);
       }
       if (step.action === "http.request") {
