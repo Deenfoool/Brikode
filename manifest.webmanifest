@@ -1,0 +1,10 @@
+{
+  "name": "Brikode",
+  "short_name": "Brikode",
+  "description": "Build bots and automations with blocks or code.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080b14",
+  "theme_color": "#080b14"
+}

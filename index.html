@@ -1,90 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Brikode — build bots and automations with blocks or code.">
-  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Brikode — build bots and automations with blocks or code, then export them for self-hosting.">
+  <meta name="theme-color" content="#080b14">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self' https:; worker-src 'self' blob: data: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self';">
   <title>Brikode — Blocks + Code</title>
   <link rel="stylesheet" href="./assets/app.css">
+  <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="./" aria-label="Brikode home">
-      <span class="brand-mark" aria-hidden="true">B</span>
-      <span>Brikode</span>
-    </a>
-    <nav class="nav" aria-label="Primary navigation">
-      <a href="https://github.com/Deenfoool/Brikode/blob/main/ROADMAP.md">Roadmap</a>
-      <a href="https://github.com/Deenfoool/Brikode">GitHub</a>
-    </nav>
-  </header>
+  <noscript>
+    <div class="noscript">Brikode requires JavaScript.</div>
+  </noscript>
 
-  <main>
-    <section class="hero">
-      <div class="eyebrow">VISUAL AUTOMATION BUILDER</div>
-      <h1>Build with blocks.<br><span>Go deeper with code.</span></h1>
-      <p class="lead">
-        One workflow, two authoring modes. Build bots and automations visually,
-        switch to code when you need full control, then export a self-hosted project.
-      </p>
+  <div id="app" class="app-root" aria-live="polite"></div>
 
-      <div class="actions">
-        <button class="button button-primary" type="button" id="builderButton">Open Builder</button>
-        <button class="button button-secondary" type="button" id="cloudButton">
-          Cloud Deploy <span class="badge">Coming soon</span>
-        </button>
-      </div>
-
-      <p class="status" id="status" role="status">
-        Foundation stage — editor implementation follows the repository roadmap.
-      </p>
-    </section>
-
-    <section class="mode-grid" aria-label="Brikode authoring modes">
-      <article class="mode-card">
-        <div class="mode-icon" aria-hidden="true">▦</div>
-        <p class="mode-kicker">NO-CODE</p>
-        <h2>Blocks</h2>
-        <p>Compose triggers, conditions, API calls and actions as understandable visual building blocks.</p>
-      </article>
-
-      <article class="mode-card">
-        <div class="mode-icon code-icon" aria-hidden="true">&lt;/&gt;</div>
-        <p class="mode-kicker">ADVANCED</p>
-        <h2>Code</h2>
-        <p>Use a structured code editor backed by the same workflow representation as the visual builder.</p>
-      </article>
-    </section>
-
-    <section class="pipeline" aria-label="Brikode architecture">
-      <div><strong>Blocks</strong><span>Visual builder</span></div>
-      <span class="arrow" aria-hidden="true">→</span>
-      <div><strong>Workflow IR</strong><span>Single source of truth</span></div>
-      <span class="arrow" aria-hidden="true">→</span>
-      <div><strong>Code</strong><span>Advanced editor</span></div>
-      <span class="arrow" aria-hidden="true">→</span>
-      <div><strong>Export</strong><span>Self-host runtime</span></div>
-    </section>
-  </main>
-
-  <footer>
-    <span>Brikode · 2026</span>
-    <span>Cloud runtime is not part of v1.</span>
-  </footer>
-
-  <dialog id="cloudDialog">
-    <form method="dialog">
-      <div class="dialog-kicker">CLOUD DEPLOY</div>
+  <dialog id="cloudDialog" class="modal">
+    <form method="dialog" class="modal-card">
+      <div class="eyebrow">CLOUD DEPLOY</div>
       <h2>Coming soon</h2>
       <p>
-        Brikode v1 uses Export / Self-host. Hosted execution will be added only after
-        the runtime, secret storage, isolation and deployment infrastructure are ready.
+        Brikode v1 intentionally deploys through Export / Self-host.
+        Hosted execution will be enabled only after isolated workers,
+        encrypted secrets, logging and deployment lifecycle are ready.
       </p>
-      <button class="button button-primary" value="close">Got it</button>
+      <div class="modal-actions">
+        <button class="button button-primary" value="close">Got it</button>
+      </div>
     </form>
   </dialog>
 
-  <script src="./assets/app.js"></script>
+  <div id="toastRegion" class="toast-region" aria-live="assertive"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/blockly@13.2.0/blockly_compressed.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/blockly@13.2.0/blocks_compressed.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/blockly@13.2.0/msg/en.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs/loader.js"></script>
+  <script type="module" src="./assets/app.js"></script>
 </body>
 </html>
