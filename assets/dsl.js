@@ -11,12 +11,14 @@ function unquote(value) {
   return JSON.parse(value);
 }
 
-function parseLine(raw) {
-  return raw.trim();
+function stableId(value, prefix = "node") {
+  const clean = String(value || "").replace(/[^A-Za-z0-9_-]/g, "");
+  return clean || uid(prefix);
 }
 
 function actionToLines(step, indent, lines) {
   const pad = "  ".repeat(indent);
+  lines.push(pad + "# @id " + stableId(step.id));
 
   if (step.type === "condition") {
     const expr = step.expression || {};
@@ -82,6 +84,7 @@ export function projectToDsl(project) {
   if (!p.trigger) {
     lines.push("# Add a trigger in Blocks mode or write one here.");
   } else {
+    lines.push("# @trigger-id " + stableId(p.trigger.id, "trigger"));
     const config = p.trigger.config || {};
     switch (p.trigger.type) {
       case "telegram.message":
@@ -113,47 +116,48 @@ export function projectToDsl(project) {
   return lines.join("\n");
 }
 
-function parseAction(line, lineNumber) {
+function parseAction(line, lineNumber, nodeId) {
   let match;
+  const id = stableId(nodeId);
 
   match = line.match(new RegExp("^TELEGRAM_SEND\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id: uid("node"), type: "action", action: "telegram.sendMessage", config: { text: unquote(match[1]) } };
+  if (match) return { id, type: "action", action: "telegram.sendMessage", config: { text: unquote(match[1]) } };
 
   match = line.match(new RegExp("^TELEGRAM_FILE\\s+(" + QUOTED + ")\\s+CAPTION\\s+(" + QUOTED + ")$", "i"));
   if (match) return {
-    id: uid("node"),
+    id,
     type: "action",
     action: "telegram.sendFile",
     config: { url: unquote(match[1]), caption: unquote(match[2]) }
   };
 
   match = line.match(new RegExp("^DISCORD_SEND\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id: uid("node"), type: "action", action: "discord.sendMessage", config: { text: unquote(match[1]) } };
+  if (match) return { id, type: "action", action: "discord.sendMessage", config: { text: unquote(match[1]) } };
 
   match = line.match(new RegExp("^HTTP\\s+(GET|POST|PUT|PATCH|DELETE)\\s+(" + QUOTED + ")\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)$", "i"));
   if (match) return {
-    id: uid("node"),
+    id,
     type: "action",
     action: "http.request",
     config: { method: match[1].toUpperCase(), url: unquote(match[2]), as: match[3] }
   };
 
   match = line.match(/^DELAY\s+(\d+)$/i);
-  if (match) return { id: uid("node"), type: "action", action: "core.delay", config: { ms: Number(match[1]) } };
+  if (match) return { id, type: "action", action: "core.delay", config: { ms: Number(match[1]) } };
 
   match = line.match(new RegExp("^LOG\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id: uid("node"), type: "action", action: "core.log", config: { message: unquote(match[1]) } };
+  if (match) return { id, type: "action", action: "core.log", config: { message: unquote(match[1]) } };
 
   match = line.match(new RegExp("^SET\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(" + QUOTED + ")$", "i"));
   if (match) return {
-    id: uid("node"),
+    id,
     type: "action",
     action: "core.setVariable",
     config: { name: match[1], value: unquote(match[2]) }
   };
 
   match = line.match(new RegExp("^RAW_JS\\s+(" + QUOTED + ")$", "i"));
-  if (match) return { id: uid("node"), type: "action", action: "core.customCode", config: { source: unquote(match[1]) } };
+  if (match) return { id, type: "action", action: "core.customCode", config: { source: unquote(match[1]) } };
 
   throw new Error("Line " + lineNumber + ": unsupported statement.");
 }
@@ -162,24 +166,35 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
   const diagnostics = [];
   const project = createProject(fallbackName);
   const stack = [{ steps: project.steps, condition: null }];
-
   const lines = String(source || "").split(/\r?\n/);
   let sawWorkflow = false;
   let sawTrigger = false;
+  let pendingId = null;
+  let pendingTriggerId = null;
 
-  const error = (line, message) => diagnostics.push({
-    severity: "error",
-    line,
-    message
-  });
+  const error = (line, message) => diagnostics.push({ severity: "error", line, message });
 
   for (let index = 0; index < lines.length; index++) {
     const lineNumber = index + 1;
-    const line = parseLine(lines[index]);
+    const line = lines[index].trim();
 
-    if (!line || line.startsWith("#")) continue;
+    if (!line) continue;
 
-    let match = line.match(new RegExp("^WORKFLOW\\s+(" + QUOTED + ")$", "i"));
+    let match = line.match(/^#\s*@id\s+([A-Za-z0-9_-]+)$/i);
+    if (match) {
+      pendingId = match[1];
+      continue;
+    }
+
+    match = line.match(/^#\s*@trigger-id\s+([A-Za-z0-9_-]+)$/i);
+    if (match) {
+      pendingTriggerId = match[1];
+      continue;
+    }
+
+    if (line.startsWith("#")) continue;
+
+    match = line.match(new RegExp("^WORKFLOW\\s+(" + QUOTED + ")$", "i"));
     if (match) {
       project.name = unquote(match[1]);
       sawWorkflow = true;
@@ -188,42 +203,60 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
 
     match = line.match(/^TRIGGER\s+telegram\.message$/i);
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "telegram.message", config: {} };
+      project.trigger = { id: stableId(pendingTriggerId, "trigger"), type: "telegram.message", config: {} };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
 
     match = line.match(new RegExp("^TRIGGER\\s+telegram\\.command\\s+(" + QUOTED + ")$", "i"));
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "telegram.command", config: { command: unquote(match[1]) } };
+      project.trigger = {
+        id: stableId(pendingTriggerId, "trigger"),
+        type: "telegram.command",
+        config: { command: unquote(match[1]) }
+      };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
 
     match = line.match(/^TRIGGER\s+telegram\.callback$/i);
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "telegram.callback", config: {} };
+      project.trigger = { id: stableId(pendingTriggerId, "trigger"), type: "telegram.callback", config: {} };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
 
     match = line.match(/^TRIGGER\s+discord\.message$/i);
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "discord.message", config: {} };
+      project.trigger = { id: stableId(pendingTriggerId, "trigger"), type: "discord.message", config: {} };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
 
     match = line.match(new RegExp("^TRIGGER\\s+discord\\.slash\\s+(" + QUOTED + ")$", "i"));
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "discord.slash", config: { command: unquote(match[1]) } };
+      project.trigger = {
+        id: stableId(pendingTriggerId, "trigger"),
+        type: "discord.slash",
+        config: { command: unquote(match[1]) }
+      };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
 
     match = line.match(new RegExp("^TRIGGER\\s+webhook\\.incoming\\s+(" + QUOTED + ")$", "i"));
     if (match) {
-      project.trigger = { id: uid("trigger"), type: "webhook.incoming", config: { path: unquote(match[1]) } };
+      project.trigger = {
+        id: stableId(pendingTriggerId, "trigger"),
+        type: "webhook.incoming",
+        config: { path: unquote(match[1]) }
+      };
+      pendingTriggerId = null;
       sawTrigger = true;
       continue;
     }
@@ -231,7 +264,7 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
     match = line.match(new RegExp("^IF\\s+(" + QUOTED + ")\\s+(EQUALS|CONTAINS|NOTEQUALS|EXISTS)\\s+(" + QUOTED + ")$", "i"));
     if (match) {
       const condition = {
-        id: uid("node"),
+        id: stableId(pendingId),
         type: "condition",
         expression: {
           left: unquote(match[1]),
@@ -241,6 +274,7 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
         then: [],
         else: []
       };
+      pendingId = null;
       stack.at(-1).steps.push(condition);
       stack.push({ steps: condition.then, condition, branch: "then" });
       continue;
@@ -271,7 +305,8 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
     }
 
     try {
-      stack.at(-1).steps.push(parseAction(line, lineNumber));
+      stack.at(-1).steps.push(parseAction(line, lineNumber, pendingId));
+      pendingId = null;
     } catch (parseError) {
       error(lineNumber, parseError.message);
     }
@@ -287,8 +322,5 @@ export function parseDsl(source, fallbackName = "Untitled bot") {
     diagnostics.push({ severity: "warning", line: 1, message: "No TRIGGER declaration found." });
   }
 
-  return {
-    project: normalizeProject(project),
-    diagnostics
-  };
+  return { project: normalizeProject(project), diagnostics };
 }
