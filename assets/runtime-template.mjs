@@ -110,6 +110,24 @@ async function runAction(step, scope, adapters) {
       return result;
     }
 
+    case "telegram.sendButtons": {
+      const chatId = renderTemplate(config.chatId || scope.trigger.chatId || "", scope);
+      if (!chatId) throw new Error("Telegram chat id is missing.");
+      let buttons;
+      try {
+        buttons = JSON.parse(renderTemplate(config.buttons || "[]", scope));
+      } catch {
+        throw new Error("Telegram buttons must be valid JSON.");
+      }
+      const result = await telegramApi("sendMessage", {
+        chat_id: chatId,
+        text: renderTemplate(config.text, scope),
+        reply_markup: { inline_keyboard: buttons }
+      });
+      scope.steps[step.id] = result;
+      return result;
+    }
+
     case "discord.sendMessage": {
       const text = renderTemplate(config.text, scope);
       if (adapters.interaction) {
@@ -136,11 +154,60 @@ async function runAction(step, scope, adapters) {
       return result;
     }
 
+    case "discord.reply": {
+      const text = renderTemplate(config.text, scope);
+      if (adapters.interaction) {
+        const result = adapters.interaction.replied || adapters.interaction.deferred
+          ? await adapters.interaction.followUp(text)
+          : await adapters.interaction.reply(text);
+        scope.steps[step.id] = result;
+        return result;
+      }
+      if (!adapters.discordMessage) throw new Error("Discord reply requires a message or interaction trigger.");
+      const result = await adapters.discordMessage.reply(text);
+      scope.steps[step.id] = result;
+      return result;
+    }
+
+    case "discord.sendEmbed": {
+      const payload = {
+        embeds: [{
+          title: renderTemplate(config.title || "", scope),
+          description: renderTemplate(config.description || "", scope)
+        }]
+      };
+      let result;
+      if (adapters.interaction) {
+        result = adapters.interaction.replied || adapters.interaction.deferred
+          ? await adapters.interaction.followUp(payload)
+          : await adapters.interaction.reply(payload);
+      } else if (adapters.discordChannel) {
+        result = await adapters.discordChannel.send(payload);
+      } else {
+        const channelId = renderTemplate(config.channelId || scope.trigger.channelId || "", scope);
+        if (!channelId || !adapters.discordClient) throw new Error("Discord channel is unavailable.");
+        const channel = await adapters.discordClient.channels.fetch(channelId);
+        result = await channel.send(payload);
+      }
+      scope.steps[step.id] = result;
+      return result;
+    }
+
     case "http.request": {
       const method = String(config.method || "GET").toUpperCase();
       const headers = parseMaybeJson(config.headers, scope) || {};
       const bodyValue = parseMaybeJson(config.body, scope);
-      const options = { method, headers };
+      const query = parseMaybeJson(config.query, scope) || {};
+      const url = new URL(renderTemplate(config.url, scope));
+
+      if (query && typeof query === "object" && !Array.isArray(query)) {
+        for (const [key, value] of Object.entries(query)) {
+          if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+        }
+      }
+
+      const timeoutMs = Math.min(120000, Math.max(100, Number(config.timeoutMs) || 10000));
+      const options = { method, headers, signal: AbortSignal.timeout(timeoutMs) };
 
       if (!["GET", "HEAD"].includes(method) && bodyValue !== undefined) {
         if (typeof bodyValue === "string") {
@@ -153,18 +220,30 @@ async function runAction(step, scope, adapters) {
         }
       }
 
-      const response = await fetch(renderTemplate(config.url, scope), options);
-      const contentType = response.headers.get("content-type") || "";
-      const body = contentType.includes("application/json")
-        ? await response.json()
-        : await response.text();
+      let result;
+      try {
+        const response = await fetch(url, options);
+        const contentType = response.headers.get("content-type") || "";
+        const body = contentType.includes("application/json")
+          ? await response.json()
+          : await response.text();
 
-      const result = {
-        status: response.status,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries()),
-        body
-      };
+        result = {
+          status: response.status,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries()),
+          body,
+          error: null
+        };
+      } catch (error) {
+        result = {
+          status: 0,
+          ok: false,
+          headers: {},
+          body: null,
+          error: error.message
+        };
+      }
 
       const name = config.as || "response";
       scope.vars[name] = result;
@@ -203,6 +282,16 @@ async function runAction(step, scope, adapters) {
 async function executeSteps(steps, scope, adapters) {
   for (const step of steps || []) {
     try {
+      if (step.type === "repeat") {
+        const times = Math.min(1000, Math.max(0, Number(step.times) || 0));
+        log("debug", "Repeat " + step.id + " ×" + times);
+        for (let index = 0; index < times; index++) {
+          scope.vars.loopIndex = index;
+          await executeSteps(step.steps, scope, adapters);
+        }
+        continue;
+      }
+
       if (step.type === "condition") {
         const result = testCondition(step.expression, scope);
         log("debug", "Condition " + step.id + " → " + result);
@@ -368,7 +457,8 @@ async function startDiscord() {
       channelId: message.channelId
     }, {
       discordClient: client,
-      discordChannel: message.channel
+      discordChannel: message.channel,
+      discordMessage: message
     }).catch(error => log("error", "Discord workflow failed.", { error: error.message }));
   });
 

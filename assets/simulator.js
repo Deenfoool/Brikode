@@ -57,6 +57,17 @@ export async function simulateProject(project, payload = {}) {
 
   const execute = async steps => {
     for (const step of steps || []) {
+      if (step.type === "repeat") {
+        const times = Math.min(1000, Math.max(0, Number(step.times) || 0));
+        push(step.id, "running", "Repeat ×" + times);
+        for (let index = 0; index < times; index++) {
+          scope.vars.loopIndex = index;
+          await execute(step.steps);
+        }
+        push(step.id, "success", "Repeat completed ×" + times);
+        continue;
+      }
+
       if (step.type === "condition") {
         const result = testCondition(step.expression, scope);
         push(step.id, "success", "Condition → " + String(result), step.expression);
@@ -81,9 +92,29 @@ export async function simulateProject(project, payload = {}) {
           });
           break;
 
+        case "telegram.sendButtons":
+          push(step.id, "success", "Telegram inline buttons (simulated)", {
+            text: renderTemplate(config.text, scope),
+            buttons: config.buttons
+          });
+          break;
+
         case "discord.sendMessage":
           push(step.id, "success", "Discord message (simulated)", {
             text: renderTemplate(config.text, scope)
+          });
+          break;
+
+        case "discord.reply":
+          push(step.id, "success", "Discord reply (simulated)", {
+            text: renderTemplate(config.text, scope)
+          });
+          break;
+
+        case "discord.sendEmbed":
+          push(step.id, "success", "Discord embed (simulated)", {
+            title: renderTemplate(config.title, scope),
+            description: renderTemplate(config.description, scope)
           });
           break;
 
@@ -91,7 +122,14 @@ export async function simulateProject(project, payload = {}) {
           const result = {
             status: 200,
             ok: true,
-            body: { simulated: true, url: renderTemplate(config.url, scope) },
+            body: {
+              simulated: true,
+              method: String(config.method || "GET"),
+              url: renderTemplate(config.url, scope),
+              query: config.query || "{}",
+              requestBody: renderTemplate(config.body || "", scope),
+              timeoutMs: Number(config.timeoutMs) || 10000
+            },
             headers: { "content-type": "application/json" }
           };
           const name = config.as || "response";
