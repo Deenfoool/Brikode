@@ -652,6 +652,9 @@ function collectDataPaths(project) {
         walkSteps(step.else);
         continue;
       }
+      if (step.action === "webhook.respond") {
+        ["status", "contentType", "body"].forEach(key => paths.add("vars.__webhookResponse." + key));
+      }
       if ((step.action === "core.setVariable" || step.action === "core.convert") && step.config?.name) {
         paths.add("vars." + step.config.name);
       }

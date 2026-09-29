@@ -42,7 +42,7 @@ function registerLanguage(monaco) {
     tokenizer: {
       root: [
         [/^\s*#.*/, "comment"],
-        [/\b(WORKFLOW|TRIGGER|TELEGRAM_SEND|TELEGRAM_FILE|TELEGRAM_BUTTONS|BUTTONS|CAPTION|DISCORD_SEND|DISCORD_REPLY|DISCORD_EMBED|DISCORD_BUTTONS|DESCRIPTION|HTTP|AS|WITH|DELAY|LOG|SET|CONVERT|TO|RAW_JS|IF|ELSE|END|REPEAT)\b/, "keyword"],
+        [/\b(WORKFLOW|TRIGGER|WEBHOOK_RESPOND|TELEGRAM_SEND|TELEGRAM_FILE|TELEGRAM_BUTTONS|BUTTONS|CAPTION|DISCORD_SEND|DISCORD_REPLY|DISCORD_EMBED|DISCORD_BUTTONS|DESCRIPTION|HTTP|AS|WITH|DELAY|LOG|SET|CONVERT|TO|RAW_JS|IF|ELSE|END|REPEAT)\b/, "keyword"],
         [/\b(GET|POST|PUT|PATCH|DELETE|EQUALS|CONTAINS|NOTEQUALS|EXISTS)\b/, "type.keyword"],
         [/"([^"\\]|\\.)*"/, "string"],
         [/\b\d+\b/, "number"],
@@ -66,6 +66,7 @@ function registerLanguage(monaco) {
         ["TRIGGER discord.message", "Discord message trigger"],
         ['TRIGGER discord.slash "ping"', "Discord slash command trigger"],
         ['TRIGGER webhook.incoming "/hook"', "Incoming webhook trigger"],
+        ['WEBHOOK_RESPOND 200 TYPE "application/json" BODY "{\\\"ok\\\":true}"', "Set webhook response"],
         ['TELEGRAM_SEND "Hello {{trigger.text}}"', "Send Telegram message"],
         ['TELEGRAM_BUTTONS "Choose" BUTTONS "[[{\\\"text\\\":\\\"OK\\\",\\\"callback_data\\\":\\\"ok\\\"}]]"', "Telegram inline buttons"],
         ['DISCORD_SEND "Hello {{trigger.text}}"', "Send Discord message"],

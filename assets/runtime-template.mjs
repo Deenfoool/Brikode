@@ -87,6 +87,17 @@ async function runAction(step, scope, adapters) {
   const config = step.config || {};
 
   switch (step.action) {
+    case "webhook.respond": {
+      const result = {
+        status: Number(config.status) || 200,
+        contentType: String(config.contentType || "application/json"),
+        body: renderTemplate(config.body ?? "", scope)
+      };
+      scope.vars.__webhookResponse = result;
+      scope.steps[step.id] = result;
+      return result;
+    }
+
     case "telegram.sendMessage": {
       const chatId = renderTemplate(config.chatId || scope.trigger.chatId || "", scope);
       if (!chatId) throw new Error("Telegram chat id is missing.");
@@ -597,15 +608,21 @@ async function startWebhook() {
         try { body = rawBody ? JSON.parse(rawBody) : null; } catch {}
       }
 
-      await execute({
+      const scope = await execute({
         method: request.method || "GET",
         body,
         headers: request.headers,
         query: Object.fromEntries(url.searchParams.entries())
       });
 
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ ok: true }));
+      const configured = scope.vars.__webhookResponse;
+      if (configured) {
+        response.writeHead(configured.status, { "content-type": configured.contentType });
+        response.end(String(configured.body ?? ""));
+      } else {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ ok: true }));
+      }
     } catch (error) {
       log("error", "Webhook workflow failed.", { error: error.message });
       if (!response.headersSent) response.writeHead(500, { "content-type": "application/json" });

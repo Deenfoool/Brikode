@@ -79,6 +79,17 @@ export async function simulateProject(project, payload = {}) {
       push(step.id, "running", step.action);
 
       switch (step.action) {
+        case "webhook.respond": {
+          const response = {
+            status: Number(config.status) || 200,
+            contentType: config.contentType || "application/json",
+            body: renderTemplate(config.body ?? "", scope)
+          };
+          scope.vars.__webhookResponse = response;
+          push(step.id, "success", "Webhook response configured.", response);
+          break;
+        }
+
         case "telegram.sendMessage":
           push(step.id, "success", "Telegram message (simulated)", {
             text: renderTemplate(config.text, scope)
