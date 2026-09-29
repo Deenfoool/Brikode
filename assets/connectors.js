@@ -1,4 +1,4 @@
-export const CONNECTORS = Object.freeze({
+export const CONNECTORS = {
   telegram: {
     id: "telegram",
     label: "Telegram",
@@ -73,7 +73,39 @@ export const CONNECTORS = Object.freeze({
       { id: "customCode", label: "Custom JavaScript", inputs: { source: "string" }, outputs: { result: "any" } }
     ]
   }
-});
+};
+
+export function validateConnectorManifest(manifest) {
+  const errors = [];
+  if (!manifest || typeof manifest !== "object") return ["Manifest must be an object."];
+  if (!/^[a-z][a-z0-9_-]*$/.test(String(manifest.id || ""))) errors.push("Connector id must be lowercase and URL-safe.");
+  if (!String(manifest.label || "").trim()) errors.push("Connector label is required.");
+  if (!/^\d+\.\d+\.\d+$/.test(String(manifest.version || ""))) errors.push("Connector version must use x.y.z.");
+  if (!Array.isArray(manifest.triggers)) errors.push("triggers must be an array.");
+  if (!Array.isArray(manifest.actions)) errors.push("actions must be an array.");
+  if (!Array.isArray(manifest.credentials)) errors.push("credentials must be an array.");
+
+  const ids = new Set();
+  for (const operation of [...(manifest.triggers || []), ...(manifest.actions || [])]) {
+    if (!operation?.id || ids.has(operation.id)) errors.push("Operation ids must be present and unique.");
+    ids.add(operation?.id);
+    if (!String(operation?.label || "").trim()) errors.push("Every operation needs a label.");
+  }
+
+  return errors;
+}
+
+export function registerConnector(manifest, { replace = false } = {}) {
+  const errors = validateConnectorManifest(manifest);
+  if (errors.length) throw new Error("Invalid connector manifest: " + errors.join(" "));
+  if (CONNECTORS[manifest.id] && !replace) throw new Error("Connector already registered: " + manifest.id);
+  CONNECTORS[manifest.id] = structuredClone(manifest);
+  return CONNECTORS[manifest.id];
+}
+
+export function listConnectors() {
+  return Object.values(CONNECTORS).map(connector => structuredClone(connector));
+}
 
 export function getConnector(id) {
   return CONNECTORS[id] || null;

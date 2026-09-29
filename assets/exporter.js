@@ -29,7 +29,7 @@ function usesConnector(project, id) {
 function packageJson(project) {
   const dependencies = {};
   if (usesConnector(project, "discord")) {
-    dependencies["discord.js"] = "^14.27.0";
+    dependencies["discord.js"] = "14.27.0";
   }
 
   return JSON.stringify({
