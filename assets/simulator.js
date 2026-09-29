@@ -118,6 +118,13 @@ export async function simulateProject(project, payload = {}) {
           });
           break;
 
+        case "discord.sendButtons":
+          push(step.id, "success", "Discord buttons (simulated)", {
+            text: renderTemplate(config.text, scope),
+            buttons: config.buttons
+          });
+          break;
+
         case "http.request": {
           const result = {
             status: 200,
@@ -143,6 +150,31 @@ export async function simulateProject(project, payload = {}) {
           const value = scopedValue(config.value, scope);
           scope.vars[config.name] = value;
           push(step.id, "success", "Variable " + config.name + " updated.", value);
+          break;
+        }
+
+        case "core.convert": {
+          const source = scopedValue(config.value, scope);
+          let value;
+          switch (config.target) {
+            case "number":
+              value = Number(source);
+              if (!Number.isFinite(value)) throw new Error("Cannot convert value to number.");
+              break;
+            case "boolean":
+              value = typeof source === "boolean"
+                ? source
+                : ["true", "1", "yes", "on"].includes(String(source).trim().toLowerCase());
+              break;
+            case "json":
+              value = typeof source === "string" ? JSON.parse(source) : source;
+              break;
+            case "string":
+            default:
+              value = source == null ? "" : String(source);
+          }
+          scope.vars[config.name] = value;
+          push(step.id, "success", "Converted to " + config.target + " → vars." + config.name, value);
           break;
         }
 

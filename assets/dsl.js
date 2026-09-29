@@ -64,6 +64,9 @@ function actionToLines(step, indent, lines) {
     case "discord.sendEmbed":
       lines.push(pad + "DISCORD_EMBED " + quote(config.title || "") + " DESCRIPTION " + quote(config.description || "") + " TO " + quote(config.channelId || ""));
       break;
+    case "discord.sendButtons":
+      lines.push(pad + "DISCORD_BUTTONS " + quote(config.text || "") + " BUTTONS " + quote(config.buttons || "[]") + " TO " + quote(config.channelId || ""));
+      break;
     case "http.request": {
       const options = {
         query: config.query || "{}",
@@ -88,6 +91,9 @@ function actionToLines(step, indent, lines) {
       break;
     case "core.setVariable":
       lines.push(pad + "SET " + String(config.name || "value") + " = " + quote(config.value ?? ""));
+      break;
+    case "core.convert":
+      lines.push(pad + "CONVERT " + quote(config.value ?? "") + " TO " + String(config.target || "string").toUpperCase() + " AS " + String(config.name || "converted"));
       break;
     case "core.customCode":
       lines.push(pad + "RAW_JS " + quote(config.source || ""));
@@ -187,6 +193,14 @@ function parseAction(line, lineNumber, nodeId) {
     config: { title: unquote(match[1]), description: unquote(match[2]), channelId: match[3] ? unquote(match[3]) : "" }
   };
 
+  match = line.match(new RegExp("^DISCORD_BUTTONS\\s+(" + QUOTED + ")\\s+BUTTONS\\s+(" + QUOTED + ")(?:\\s+TO\\s+(" + QUOTED + "))?$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "discord.sendButtons",
+    config: { text: unquote(match[1]), buttons: unquote(match[2]), channelId: match[3] ? unquote(match[3]) : "" }
+  };
+
   match = line.match(new RegExp("^HTTP\\s+(GET|POST|PUT|PATCH|DELETE)\\s+(" + QUOTED + ")\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+WITH\\s+(" + QUOTED + "))?$", "i"));
   if (match) {
     let options = {};
@@ -225,6 +239,14 @@ function parseAction(line, lineNumber, nodeId) {
     type: "action",
     action: "core.setVariable",
     config: { name: match[1], value: unquote(match[2]) }
+  };
+
+  match = line.match(new RegExp("^CONVERT\\s+(" + QUOTED + ")\\s+TO\\s+(STRING|NUMBER|BOOLEAN|JSON)\\s+AS\\s+([A-Za-z_][A-Za-z0-9_]*)$", "i"));
+  if (match) return {
+    id,
+    type: "action",
+    action: "core.convert",
+    config: { value: unquote(match[1]), target: match[2].toLowerCase(), name: match[3] }
   };
 
   match = line.match(new RegExp("^RAW_JS\\s+(" + QUOTED + ")$", "i"));

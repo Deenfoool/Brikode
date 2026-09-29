@@ -193,6 +193,47 @@ async function runAction(step, scope, adapters) {
       return result;
     }
 
+    case "discord.sendButtons": {
+      let rows;
+      try {
+        rows = JSON.parse(renderTemplate(config.buttons || "[]", scope));
+      } catch {
+        throw new Error("Discord buttons must be valid JSON.");
+      }
+      const styleMap = { primary: 1, secondary: 2, success: 3, danger: 4, link: 5 };
+      const components = rows.map(row => ({
+        type: 1,
+        components: row.map(button => {
+          const style = styleMap[String(button.style || "primary").toLowerCase()] || 1;
+          const component = {
+            type: 2,
+            label: String(button.label || "Button").slice(0, 80),
+            style,
+            disabled: Boolean(button.disabled)
+          };
+          if (style === 5) component.url = String(button.url || "");
+          else component.custom_id = String(button.customId || button.custom_id || "button").slice(0, 100);
+          return component;
+        })
+      }));
+      const payload = { content: renderTemplate(config.text || "", scope), components };
+      let result;
+      if (adapters.interaction) {
+        result = adapters.interaction.replied || adapters.interaction.deferred
+          ? await adapters.interaction.followUp(payload)
+          : await adapters.interaction.reply(payload);
+      } else if (adapters.discordChannel) {
+        result = await adapters.discordChannel.send(payload);
+      } else {
+        const channelId = renderTemplate(config.channelId || scope.trigger.channelId || "", scope);
+        if (!channelId || !adapters.discordClient) throw new Error("Discord channel is unavailable.");
+        const channel = await adapters.discordClient.channels.fetch(channelId);
+        result = await channel.send(payload);
+      }
+      scope.steps[step.id] = result;
+      return result;
+    }
+
     case "http.request": {
       const method = String(config.method || "GET").toUpperCase();
       const headers = parseMaybeJson(config.headers, scope) || {};
@@ -253,6 +294,31 @@ async function runAction(step, scope, adapters) {
 
     case "core.setVariable": {
       const value = scopedValue(config.value, scope);
+      scope.vars[config.name] = value;
+      scope.steps[step.id] = value;
+      return value;
+    }
+
+    case "core.convert": {
+      const source = scopedValue(config.value, scope);
+      let value;
+      switch (config.target) {
+        case "number":
+          value = Number(source);
+          if (!Number.isFinite(value)) throw new Error("Cannot convert value to number.");
+          break;
+        case "boolean":
+          value = typeof source === "boolean"
+            ? source
+            : ["true", "1", "yes", "on"].includes(String(source).trim().toLowerCase());
+          break;
+        case "json":
+          value = typeof source === "string" ? JSON.parse(source) : source;
+          break;
+        case "string":
+        default:
+          value = source == null ? "" : String(source);
+      }
       scope.vars[config.name] = value;
       scope.steps[step.id] = value;
       return value;
